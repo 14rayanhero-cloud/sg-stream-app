@@ -253,6 +253,10 @@ EXTRA.fx = (m) => {
         <div class="row"><button class="btn glow sm" id="fx-copy">🔗 نسخ رابط OBS</button></div>
         <div class="sub" style="margin:8px 0 0">أضفه كـ Browser Source بحجم شاشتك كاملة (مثلاً 1920×1080) وضعه <b>فوق كل الطبقات</b>. الخلفية شفافة تلقائياً.</div></div>
     </div>
+    <div class="panel"><h3>🎞️ مكتبة صوتك وصورك (ردود فعل من عندك)</h3>
+      <div class="sub">ارفع أي مقطع صوتي (mp3 / wav / ogg / m4a) أو صورة أو GIF (png / jpg / gif / webp)، <b>حتى 600 كيلوبايت للملف و24 ملف</b>. بعدها أضف قاعدة جديدة، واختر المؤثر «ردة فعل بإيموجي كبير»، وحدّد صورتك وصوتك من القاعدة، فتظهر الصورة بالحجم الكبير مع الأشعة والجملة ويشتغل صوتك. لو الملف أكبر اضغط حجمه بأي موقع ضغط مجاني. تأكد أن عندك حق استخدام ما ترفعه (حقوق النشر).</div>
+      <div class="row" style="margin-top:10px"><button class="btn glow sm" id="fx-up">⬆️ رفع ملف</button><input type="file" id="fx-file" accept="audio/*,image/png,image/jpeg,image/gif,image/webp" multiple style="display:none"><span class="sub" id="fx-upmsg" style="margin:0"></span></div>
+      <div id="fx-lib" style="margin-top:12px;display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px"></div></div>
     <div class="panel"><h3>القواعد (<span id="fx-n"></span>)</h3><div id="fx-rules"></div>
       <div class="row" style="margin-top:12px"><button class="btn sm" id="fx-add">➕ قاعدة جديدة</button><button class="btn ghost sm" id="fx-pack">🎭 إضافة الرياكشنات الجاهزة (دخول مشاهد + كوميدي)</button><button class="btn ghost sm" id="fx-reset">↺ استرجاع القواعد الافتراضية</button></div></div>`;
   const stage = m.querySelector('#fxs'), frame = m.querySelector('#fxs-f');
@@ -260,6 +264,9 @@ EXTRA.fx = (m) => {
   fit();
   const power = () => +m.querySelector('#fx-pw').value;
   const lab = (t, inner) => `<label style="display:grid;gap:4px;font-size:12px;color:var(--mut)">${t}${inner}</label>`;
+  const myFiles = () => (me.files || []);
+  const fileUrl = (f) => '/f/' + me.token + '/' + f.id;
+  const fileOpts = (kind, cur) => myFiles().filter((f) => f.type.startsWith(kind + '/')).map((f) => { const u = fileUrl(f); return `<option value="${u}" ${u === cur ? 'selected' : ''}>${esc(f.name)}</option>`; }).join('') + (cur && !myFiles().some((f) => fileUrl(f) === cur) ? `<option value="${esc(cur)}" selected>${esc(cur)}</option>` : '');
   const ruleHtml = (r, i) => {
     const g = r.event === 'gift', l = r.event === 'like', c = r.event === 'chat';
     return `<div class="card" style="margin-bottom:10px;padding:12px;${r.on === false ? 'opacity:.55' : ''}" data-i="${i}">
@@ -275,10 +282,12 @@ EXTRA.fx = (m) => {
         ${lab('القوة', `<select data-k="power">${opts({ 1: 'خفيف', 2: 'متوسط', 3: 'قوي' }, String(r.power || 1))}</select>`)}
         ${lab('نص يظهر فوق الشاشة (اختياري) — {user} {gift} {count}', `<input data-k="text" value="${esc(r.text || '')}" maxlength="80">`)}
         ${lab('الصوت', `<select data-k="sound">${opts({ auto: '🎭 صوت المؤثر (تلقائي)', ...SOUNDS }, r.sound || 'none')}</select>`)}
-        ${lab('رابط صوتك الخاص (اختياري، رابط https لملف mp3 — يُشغَّل بدل الصوت)', `<input data-k="audio" value="${esc(r.audio || '')}" placeholder="https://…/sound.mp3" dir="ltr">`)}
+        ${lab('🎵 صوتك الخاص (من مكتبتك — يُشغَّل بدل الصوت أعلاه)', `<select data-k="audio"><option value="">— بدون —</option>${fileOpts('audio', r.audio)}</select>`)}
+        ${lab('🖼️ صورتك أو GIF (بدل الإيموجي في ردود الفعل)', `<select data-k="img"><option value="">— بدون (إيموجي) —</option>${fileOpts('image', r.img)}</select>`)}
         ${lab('فترة انتظار (ثانية)', `<input type="number" min="0" max="600" data-k="cd" value="${+r.cd || 0}">`)}</div></div>`;
   };
-  const draw = () => { m.querySelector('#fx-n').textContent = F.rules.length; m.querySelector('#fx-rules').innerHTML = F.rules.length ? F.rules.map(ruleHtml).join('') : '<div class="sub">ما فيه قواعد. اضغط «قاعدة جديدة».</div>'; };
+  const libDraw = () => { const el = m.querySelector('#fx-lib'); el.innerHTML = myFiles().length ? myFiles().map((f) => `<div class="card" style="padding:10px" data-fid="${f.id}"><div style="font-size:12px;margin-bottom:6px;word-break:break-all">${f.type.startsWith('image/') ? '🖼️' : '🎵'} ${esc(f.name)} · ${Math.ceil(f.size / 1024)} KB</div>${f.type.startsWith('image/') ? `<img src="${fileUrl(f)}" style="max-width:100%;max-height:90px;border-radius:8px">` : `<audio controls preload="none" src="${fileUrl(f)}" style="width:100%;height:34px"></audio>`}<button class="btn ghost sm" data-fdel="${f.id}" style="margin-top:6px">🗑 حذف</button></div>`).join('') : '<div class="sub">ما رفعت شي بعد.</div>'; };
+  const draw = () => { libDraw(); m.querySelector('#fx-n').textContent = F.rules.length; m.querySelector('#fx-rules').innerHTML = F.rules.length ? F.rules.map(ruleHtml).join('') : '<div class="sub">ما فيه قواعد. اضغط «قاعدة جديدة».</div>'; };
   draw();
   const box = m.querySelector('#fx-rules');
   const onEdit = (e) => {
@@ -292,9 +301,20 @@ EXTRA.fx = (m) => {
     const b = e.target.closest('[data-act]'); if (!b) return; const card = b.closest('[data-i]'), i = +card.dataset.i, r = F.rules[i];
     if (b.dataset.act === 'del') { F.rules.splice(i, 1); saveCfg(); draw(); }
     else if (b.dataset.act === 'nocolor') { r.color = ''; saveCfg(); toast('اللون تلقائي'); }
-    else if (b.dataset.act === 'try') fire({ type: 'fxtest', effect: r.effect, emoji: r.emoji || '', color: r.color || '', power: +r.power || 2 });
+    else if (b.dataset.act === 'try') fire({ type: 'fxtest', effect: r.effect, emoji: r.emoji || '', color: r.color || '', power: +r.power || 2, img: r.img || '', audio: r.audio || '' });
   });
-  m.querySelector('#fx-add').onclick = () => { F.rules.push({ on: true, name: 'قاعدة جديدة', event: 'gift', min: 1, match: '', effect: 'fireworks', emoji: '', color: '', power: 2, text: '', sound: 'none', cd: 2 }); saveCfg(); draw(); box.lastElementChild && box.lastElementChild.scrollIntoView({ block: 'center' }); };
+  m.querySelector('#fx-up').onclick = () => m.querySelector('#fx-file').click();
+  m.querySelector('#fx-file').onchange = async (e) => {
+    const msg = m.querySelector('#fx-upmsg'), list = [...e.target.files]; e.target.value = '';
+    for (const f of list) {
+      if (f.size > 600 * 1024) { toast('«' + f.name + '» أكبر من 600 كيلوبايت', 'warn'); continue; }
+      msg.textContent = '… جاري رفع ' + f.name;
+      try { const data = await new Promise((ok, no) => { const r = new FileReader(); r.onload = () => ok(String(r.result).split(',')[1] || ''); r.onerror = no; r.readAsDataURL(f); }); setMe(await api('/api/upload', { name: f.name, type: f.type, data })); toast('تم رفع ' + f.name); }
+      catch (err) { toast(err.message || 'تعذّر رفع الملف', 'warn'); }
+    }
+    msg.textContent = ''; draw();
+  };
+  m.querySelector('#fx-lib').addEventListener('click', async (e) => { const b = e.target.closest('[data-fdel]'); if (!b) return; if (!confirm('حذف هذا الملف؟ القواعد اللي تستخدمه ستفقده.')) return; setMe(await api('/api/upload/delete', { id: b.dataset.fdel })); draw(); });  m.querySelector('#fx-add').onclick = () => { F.rules.push({ on: true, name: 'قاعدة جديدة', event: 'gift', min: 1, match: '', effect: 'fireworks', emoji: '', color: '', power: 2, text: '', sound: 'none', cd: 2 }); saveCfg(); draw(); box.lastElementChild && box.lastElementChild.scrollIntoView({ block: 'center' }); };
   m.querySelector('#fx-pack').onclick = () => { let n = 0; FX_PACK_RULES.forEach((p) => { if (!F.rules.some((r) => r.name === p.name)) { F.rules.push(JSON.parse(JSON.stringify(p))); n++; } }); saveCfg(); draw(); toast(n ? 'تمت إضافة ' + n + ' قاعدة جاهزة' : 'القواعد الجاهزة موجودة من قبل', n ? 'ok' : 'warn'); };
   m.querySelector('#fx-reset').onclick = () => { if (!confirm('استرجاع القواعد الافتراضية؟ ستُحذف تعديلاتك على القواعد.')) return; F.rules = JSON.parse(JSON.stringify(FX_DEFAULT_RULES)); saveCfg(); draw(); toast('تم استرجاع القواعد الافتراضية'); };
   bind('fx-on', (el) => F.on = el.checked, 'change');

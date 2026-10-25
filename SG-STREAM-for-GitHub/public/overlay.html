@@ -162,6 +162,7 @@
   .fxr.out { animation:fxrout .45s forwards; }
   .fxr .rays { position:absolute; left:50%; top:46%; width:820px; height:820px; margin:-410px 0 0 -410px; border-radius:50%; background:repeating-conic-gradient(from 0deg,var(--fc) 0 9deg,transparent 9deg 18deg); opacity:.4; -webkit-mask-image:radial-gradient(circle,#000 18%,transparent 68%); mask-image:radial-gradient(circle,#000 18%,transparent 68%); animation:fxspin 9s linear infinite; }
   .fxr .em { position:relative; font-size:250px; line-height:1.05; filter:drop-shadow(0 14px 26px rgba(0,0,0,.55)) drop-shadow(0 0 40px var(--fc)); animation:fxwig .6s ease-in-out .5s 3; }
+  .fxr .em img { display:block; max-width:620px; max-height:400px; border-radius:20px; margin:0 auto; }
   .fxr .ph { position:relative; margin-top:6px; font:900 64px/1.2 'Cairo',system-ui,sans-serif; color:#fff; -webkit-text-stroke:7px #111; paint-order:stroke fill; text-shadow:0 7px 0 var(--fc),0 14px 30px rgba(0,0,0,.6); transform:rotate(-3deg); white-space:nowrap; }
   @keyframes fxrin { from { opacity:0; transform:translate(-50%,-50%) scale(.2) rotate(-14deg); } }
   @keyframes fxrout { to { opacity:0; transform:translate(-50%,-64%) scale(.7); } }
@@ -565,11 +566,11 @@ const FXE = (() => {
   // ---- reactions: a big emoji pops with comic rays + a phrase, plus the matching little particle show ----
   function reaction(id, o) {
     const d = FX_REACT[id] || FX_REACT.reaction, w = $i('fxw'); if (!w) return;
-    const col = o.color || d[3], em = glyphs(o.emoji, [d[0]])[0], phrase = String(o.text || d[1] || '').replace(/\{user\}/g, o.user || '');
+    const okImg = /^(\/f\/[a-f0-9]{32}\/[a-f0-9]{16}|https:\/\/[^\s'"<>]{4,500})$/i.test(o.img || ''), col = o.color || d[3], em = glyphs(o.emoji, [d[0]])[0], phrase = String(o.text || d[1] || '').replace(/\{user\}/g, o.user || '');
     w.querySelectorAll('.fxr').forEach((x) => x.remove());
     const el = document.createElement('div'); el.className = 'fxr v-' + id + (id === 'welcome' ? ' welcome' : ''); el.style.setProperty('--fc', col);
     if (id === 'welcome') { el.innerHTML = '<div class="spot"></div><div class="wc"><i></i><span></span></div>'; el.querySelector('i').textContent = em; el.querySelector('span').textContent = phrase; }
-    else { el.innerHTML = '<div class="rays"></div><div class="em"></div>' + (phrase ? '<div class="ph"></div>' : ''); el.querySelector('.em').textContent = em; if (phrase) el.querySelector('.ph').textContent = phrase; }
+    else { el.innerHTML = '<div class="rays"></div><div class="em"></div>' + (phrase ? '<div class="ph"></div>' : ''); if (okImg) { const im = document.createElement('img'); im.src = o.img; im.referrerPolicy = 'no-referrer'; el.querySelector('.em').appendChild(im); } else el.querySelector('.em').textContent = em; if (phrase) el.querySelector('.ph').textContent = phrase; }
     w.appendChild(el); const hold = id === 'welcome' ? 3000 : 2700; setTimeout(() => { el.classList.add('out'); setTimeout(() => el.remove(), 480); }, hold);
     const p = { power: 2, emoji: '', color: col };
     if (id === 'meme_laugh') emoji({ ...p, emoji: '😂🤣' }, 'burst', ['😂']); else if (id === 'meme_cry') emoji({ ...p, emoji: '💧😢' }, 'rain', ['💧']); else if (id === 'meme_clap') { emoji({ ...p, emoji: '👏' }, 'burst', ['👏']); confetti({ ...p, power: 1 }); }
@@ -581,7 +582,7 @@ const FXE = (() => {
     confetti, emojirain: (o) => emoji(o, 'rain', ['🎁', '✨', '🎉']), emojiburst: (o) => emoji(o, 'burst', ['🎉', '💎', '🔥', '⭐']), hearts: (o) => emoji(o, 'rise', ['❤️', '💖', '💗', '💕', '💘']),
     balloons, coins: (o) => emoji({ ...o, emoji: o.emoji || '🪙💰' }, 'rain', ['🪙']), snow, stars, lightning, shockwave, flash: (o) => { flash = .9; flashCol = o.color || '#fff'; },
   };
-  const run = (id, o = {}) => { const f = effects[id]; if (f) f({ power: Math.max(1, Math.min(3, +o.power || 2)), emoji: o.emoji || '', color: o.color || '', text: o.text || '', user: o.user || '' }); };
+  const run = (id, o = {}) => { const f = effects[id]; if (f) f({ power: Math.max(1, Math.min(3, +o.power || 2)), emoji: o.emoji || '', color: o.color || '', text: o.text || '', user: o.user || '', img: o.img || '' }); };
   function step() {
     if (!ctx) return; const now = performance.now(), dt = Math.min(.05, (now - last) / 1000 || .016); last = now;
     ctx.clearRect(0, 0, W, H);
@@ -620,11 +621,11 @@ function fxBanner(text, col) {
 function fxFire(r, ev) {
   const col = r.color || '#00F0FF', txt = String(r.text || '').replace(/\{user\}/g, ev.user || '').replace(/\{gift\}/g, ev.gift || '').replace(/\{count\}/g, ev.count || 1).replace(/\{diamonds\}/g, ev.diamonds || '').replace(/\{total\}/g, ev.total || '');
   const isR = !!FX_REACT[r.effect];
-  FXE.run(r.effect, { ...r, text: isR ? txt : '', user: ev.user || '' }); if (txt && !isR) fxBanner(txt, col);
-  if (!DEMO) { const snd = r.sound === 'auto' ? (FX_REACT[r.effect] || [])[2] : r.sound; if (/^https:\/\//i.test(r.audio || '')) playSound(null, r.audio); else if (snd && snd !== 'none') playSound(snd); }
+  FXE.run(r.effect, { ...r, text: isR ? txt : '', user: ev.user || '', img: r.img || '' }); if (txt && !isR) fxBanner(txt, col);
+  if (!DEMO) { const snd = r.sound === 'auto' ? (FX_REACT[r.effect] || [])[2] : r.sound; if (/^(https:\/\/|\/f\/)/i.test(r.audio || '')) playSound(null, r.audio); else if (snd && snd !== 'none') playSound(snd); }
 }
 function fxHandle(ev, prevLikes) {
-  if (ev.type === 'fxtest') { fxFire({ effect: ev.effect, emoji: ev.emoji, color: ev.color, power: ev.power, sound: 'auto', text: '' }, { user: 'سارة' }); return; }
+  if (ev.type === 'fxtest') { fxFire({ effect: ev.effect, emoji: ev.emoji, color: ev.color, power: ev.power, sound: 'auto', text: '', img: ev.img || '', audio: ev.audio || '' }, { user: 'سارة' }); return; }
   if (ev.type === 'reset' || ev.type === 'jarreset') { if (ev.type === 'reset') FXE.clear(); return; }
   const F = CFG.fx || {}; if (F.on === false) return;
   const rules = Array.isArray(F.rules) ? F.rules : FX_DEFAULT_RULES;
