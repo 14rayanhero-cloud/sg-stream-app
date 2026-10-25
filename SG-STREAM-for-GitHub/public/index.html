@@ -1,0 +1,449 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SG STREAM</title>
+<link rel="icon" type="image/png" href="logo-64.png">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap">
+<script src="lang-en.js"></script><script src="i18n.js"></script>
+<style>
+  :root { --bg:#070b16; --panel:#0d1326; --line:#1b2745; --txt:#e8ecf8; --mut:#8a94b2; --a:#00F0FF; --b:#9d4edd; --p:#ff007f; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:radial-gradient(circle at 85% -10%,#1a1340,transparent 45%),var(--bg); color:var(--txt); font-family:'Cairo','Segoe UI',Tahoma,sans-serif; }
+  #top { position:sticky; top:0; z-index:5; display:flex; align-items:center; justify-content:space-between; gap:12px; padding:10px 28px; background:rgba(7,11,22,.85); backdrop-filter:blur(8px); border-bottom:1px solid var(--line); }
+  #top .brand { font-weight:800; font-size:20px; letter-spacing:.5px; } #top .brand b { color:var(--a); text-shadow:0 0 12px var(--a); } #top .brand i { color:var(--p); font-style:normal; }
+  .col { min-width:0; }
+  .live { display:inline-flex; gap:6px; align-items:center; padding:5px 12px; border-radius:99px; font-size:13px; border:1px solid var(--line); }
+  .live.on { color:#5eead4; border-color:#14b8a6; box-shadow:0 0 12px #14b8a655; } .live.off { color:#fbbf24; }
+  .stage { position:relative; width:100%; aspect-ratio:16/9; overflow:hidden; border-radius:14px; border:1px solid var(--line); background:#05070e repeating-conic-gradient(#0a0f1d 0 25%,#070a14 0 50%) 0 0/24px 24px; }
+  .stage iframe { position:absolute; left:0; top:0; width:1920px; height:1080px; border:0; transform-origin:0 0; pointer-events:none; background:transparent; }
+  .ctl { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:10px; } .ctl label { display:block; font-size:13px; color:var(--mut); }
+  .ctl input,.ctl select,.ctl textarea { margin:4px 0 0; width:100%; padding:9px 11px; background:#0a0e1c; border:1px solid var(--line); border-radius:10px; color:var(--txt); font:inherit; }
+  .ctl input[type=color] { padding:2px; height:38px; } .ctl input[type=checkbox] { width:auto; }
+  .msg { padding:10px 14px; border-radius:12px; margin-bottom:8px; background:#0a0e1c; border:1px solid var(--line); white-space:pre-wrap; line-height:1.7; } .msg.me { border-color:var(--b); }
+  button { font:inherit; cursor:pointer; }
+  .hidden { display:none !important; }
+  /* login */
+  #login { min-height:100vh; display:grid; place-items:center; background:radial-gradient(circle at 70% 20%,#1a2250,transparent 50%),var(--bg); }
+  .box { width:min(380px,92vw); background:var(--panel); border:1px solid var(--line); border-radius:18px; padding:28px; }
+  .box h1 { margin:0 0 4px; font-size:22px; } .box p { margin:0 0 18px; color:var(--mut); font-size:14px; text-align:center; }
+  input { width:100%; padding:11px 13px; margin-bottom:12px; background:#0a0e1c; border:1px solid var(--line); border-radius:10px; color:var(--txt); font:inherit; }
+  input:focus { outline:2px solid var(--b); }
+  .btn { width:100%; padding:11px; border:0; border-radius:10px; color:#06121a; font-weight:700; background:linear-gradient(90deg,var(--a),var(--b)); }
+  .btn.sm { width:auto; padding:7px 14px; font-size:13px; }
+  .btn.ghost { background:transparent; color:var(--txt); border:1px solid var(--line); }
+  /* app */
+  #app { display:grid; grid-template-columns:230px 1fr; min-height:100vh; }
+  aside { background:var(--panel); border-left:1px solid var(--line); padding:16px 12px; display:flex; flex-direction:column; gap:2px; position:sticky; top:0; height:100vh; overflow:auto; }
+  .logo { font-weight:800; letter-spacing:1px; margin-bottom:12px; padding:0 8px; } .logo small { display:block; color:var(--mut); font-weight:400; letter-spacing:0; font-size:12px; }
+  .grp { color:var(--mut); font-size:12px; padding:12px 8px 4px; }
+  .nav { background:none; border:0; color:var(--txt); text-align:right; padding:9px 10px; border-radius:9px; display:flex; gap:8px; align-items:center; }
+  .nav:hover { background:#161d33; } .nav.on { background:#17213d; box-shadow:inset 0 0 0 1px #2c3b66; }
+  .user { margin-top:auto; padding:10px; border:1px solid var(--line); border-radius:12px; font-size:13px; }
+  main { padding:28px 34px; max-width:1200px; }
+  h2 { margin:0 0 4px; font-size:26px; } .sub { color:var(--mut); margin-bottom:20px; font-size:14px; }
+  .top { display:flex; justify-content:space-between; align-items:flex-start; gap:16px; flex-wrap:wrap; }
+  .chips { display:flex; gap:8px; flex-wrap:wrap; margin:16px 0; }
+  .chip { background:transparent; border:1px solid var(--line); color:var(--txt); padding:6px 14px; border-radius:99px; font-size:13px; }
+  .chip.on { background:#17332f; border-color:var(--a); color:var(--a); }
+  .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(260px,1fr)); gap:16px; }
+  .tpl { background:var(--panel); border:1px solid var(--line); border-radius:16px; overflow:hidden; }
+  .tpl.sel { border-color:var(--a); box-shadow:0 0 0 1px var(--a); }
+  .pvbox { position:relative; width:100%; aspect-ratio:2/1; overflow:hidden; background:#070a14 repeating-conic-gradient(#0c1122 0 25%,#080b17 0 50%) 0 0/20px 20px; }
+  .pvbox iframe { position:absolute; left:0; top:0; width:700px; height:350px; border:0; transform-origin:0 0; pointer-events:none; }
+  .tpl .bd { padding:12px 14px; } .tpl h4 { margin:0 0 4px; } .tpl p { margin:0 0 10px; color:var(--mut); font-size:13px; }
+  .tag { font-size:11px; padding:2px 8px; border-radius:99px; background:#2a2147; color:#c4b5fd; }
+  .panel { background:var(--panel); border:1px solid var(--line); border-radius:16px; padding:18px; margin-bottom:16px; }
+  .panel h3 { margin:0 0 12px; font-size:16px; }
+  .row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+  code { direction:ltr; display:block; background:#070a14; border:1px solid var(--line); padding:9px 12px; border-radius:9px; word-break:break-all; font-size:12.5px; text-align:left; margin:8px 0; }
+  .stat { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:12px; }
+  .stat div { background:#0a0e1c; border:1px solid var(--line); border-radius:12px; padding:14px; } .stat b { display:block; font-size:26px; }
+  @media (max-width:760px){ #app{grid-template-columns:1fr} aside{position:static;height:auto} main{padding:18px} }
+  /* ---- header connect button ---- */
+  button.live { background:transparent; font-family:inherit; cursor:pointer; transition:.25s; }
+  button.live.off { color:#fbbf24; border-color:#7a5a12; } button.live.off:hover { background:#2a2108; box-shadow:0 0 16px #fbbf2455; }
+  button.live.on { color:#5eead4; border-color:#14b8a6; background:linear-gradient(90deg,#062b25,#0a3a30); box-shadow:0 0 18px #14b8a688, inset 0 0 12px #14b8a633; animation:livePulse 2.2s infinite; }
+  .pdot { display:inline-block; animation:dotPulse 1.2s infinite; }
+  @keyframes dotPulse { 50% { transform:scale(1.45); opacity:.6; } } @keyframes livePulse { 50% { box-shadow:0 0 28px #14b8a6cc, inset 0 0 14px #14b8a655; } }
+  /* ---- gradient / glow buttons ---- */
+  .btn.glow { background:linear-gradient(90deg,#00F0FF,#9d4edd 60%,#ff007f); box-shadow:0 6px 22px #9d4edd55; transition:.2s; } .btn.glow:hover { transform:translateY(-1px); box-shadow:0 8px 28px #9d4edd99; }
+  .btn:disabled { opacity:.55; cursor:default; }
+  /* ---- toast ---- */
+  #toasts { position:fixed; left:20px; bottom:20px; z-index:200; display:flex; flex-direction:column; gap:10px; align-items:flex-start; }
+  .toast { padding:12px 18px; border-radius:14px; background:rgba(13,19,38,.92); backdrop-filter:blur(10px); border:1px solid #14b8a6; box-shadow:0 8px 30px #000a, 0 0 18px #14b8a655; font-weight:700; transform:translateX(-30px); opacity:0; transition:.35s; max-width:min(92vw,460px); }
+  .toast.warn { border-color:#fbbf24; box-shadow:0 8px 30px #000a, 0 0 18px #fbbf2455; } .toast.err { border-color:#f87171; box-shadow:0 8px 30px #000a, 0 0 18px #f8717155; } .toast.in { transform:none; opacity:1; }
+  /* ---- glass modal ---- */
+  .modal-bg { position:fixed; inset:0; z-index:150; display:grid; place-items:center; background:rgba(3,5,12,.6); backdrop-filter:blur(6px); opacity:0; transition:.25s; padding:16px; } .modal-bg.in { opacity:1; }
+  .modal { position:relative; width:min(440px,100%); padding:26px; border-radius:22px; background:linear-gradient(160deg,rgba(40,30,90,.55),rgba(10,16,36,.78)); border:1px solid rgba(157,78,221,.5); box-shadow:0 20px 70px #000b, 0 0 40px #9d4edd44, inset 0 1px 0 rgba(255,255,255,.15); backdrop-filter:blur(18px); transform:translateY(14px) scale(.97); transition:.25s; }
+  .modal-bg.in .modal { transform:none; } .modal .x, .drawer .x { position:absolute; top:12px; left:12px; border:0; background:rgba(255,255,255,.08); color:var(--txt); width:32px; height:32px; border-radius:50%; } .drawer .x { position:static; }
+  .modal .mt { font-size:22px; font-weight:800; margin-bottom:6px; } .modal .mp { color:var(--mut); margin:0 0 16px; font-size:14px; } .err { color:#f87171; font-size:13px; min-height:18px; margin-bottom:8px; }
+  .okbox { background:#0a2f27; border:1px solid #14b8a6; border-radius:12px; padding:10px 14px; margin-bottom:12px; color:#5eead4; }
+  /* ---- slide-over drawer ---- */
+  .drawer-bg { position:fixed; inset:0; z-index:140; background:rgba(3,5,12,.55); backdrop-filter:blur(3px); opacity:0; transition:.3s; } .drawer-bg.in { opacity:1; }
+  .drawer { position:absolute; top:0; bottom:0; left:0; width:min(480px,100%); background:linear-gradient(180deg,#0f1530,#090d1d); border-right:1px solid var(--line); box-shadow:20px 0 60px #000a; transform:translateX(-100%); transition:.32s cubic-bezier(.2,.8,.2,1); display:flex; flex-direction:column; }
+  .drawer-bg.in .drawer { transform:none; } .drawer .dh { display:flex; justify-content:space-between; align-items:center; padding:16px 20px; border-bottom:1px solid var(--line); font-size:18px; } .drawer .db { padding:18px 20px; overflow:auto; flex:1; }
+  .pvbox.big { aspect-ratio:2/1; border-radius:14px; border:1px solid var(--line); }
+  .czgrid { display:grid; gap:14px; } .czrow { display:block; color:var(--mut); font-size:13px; } .czrow b { color:var(--a); margin-inline-start:6px; } .czrow input[type=range] { width:100%; margin:8px 0 0; padding:0; accent-color:#9d4edd; } .czrow select { width:100%; margin-top:6px; padding:9px; background:#0a0e1c; border:1px solid var(--line); border-radius:10px; color:var(--txt); font:inherit; }
+  .seg { display:flex; gap:6px; margin-top:6px; } .seg button { flex:1; padding:8px; border-radius:10px; border:1px solid var(--line); background:transparent; color:var(--txt); } .seg button.on { background:#17332f; border-color:var(--a); color:var(--a); } .seg button:disabled { opacity:.4; }
+  /* ---- template cards ---- */
+  .tpl.sel { border-color:#14b8a6; box-shadow:0 0 0 1px #14b8a6, 0 0 24px #14b8a633; } .live-tag { background:#0f3a31; color:#5eead4; } .tpl .cta { flex:1 1 100%; }
+  .tpl .acts { display:flex; gap:8px; flex-wrap:wrap; } .tpl .acts .btn.ghost { flex:1; }
+  .tpl:hover { border-color:#3b4a7a; transform:translateY(-2px); transition:.2s; }
+  .top.srch { flex-wrap:nowrap; align-items:center; } .top.srch input { width:260px; margin:0; }
+  @media (max-width:760px){ .top.srch { flex-wrap:wrap; } }
+  /* ---- control deck ---- */
+  .deck { display:grid; grid-template-columns:repeat(auto-fill,minmax(210px,1fr)); gap:12px; }
+  .dk { border:1px solid var(--line); border-radius:16px; padding:16px 12px; background:linear-gradient(160deg,#121a38,#0b1022); color:var(--txt); font-weight:800; text-align:center; transition:.18s; } .dk span { display:block; font-size:30px; margin-bottom:6px; }
+  .dk:hover { transform:translateY(-3px); border-color:var(--b); box-shadow:0 10px 26px #9d4edd33; } .dk:active { transform:scale(.97); }
+  .dk.hot { background:linear-gradient(160deg,#3a1050,#14103a); border-color:#ff007f88; } .dk.gold { background:linear-gradient(160deg,#3a2a08,#17110a); border-color:#fbbf2488; }
+  /* ---- misc pages ---- */
+  .seglist { display:grid; gap:8px; } .seglist .r { display:grid; grid-template-columns:1fr 54px 40px; gap:8px; align-items:center; } .seglist input[type=color] { padding:2px; height:38px; margin:0; }
+  html[dir=ltr] .nav { text-align:left } html[dir=ltr] aside { border-left:0; border-right:1px solid var(--line) } html[dir=ltr] .tbl th { text-align:left } html[dir=ltr] .modal .x { left:auto; right:12px } html[dir=ltr] #toasts { left:auto; right:20px; align-items:flex-end } html[dir=ltr] body { font-family:'Cairo','Segoe UI',system-ui,sans-serif }
+  .tbl { width:100%; border-collapse:collapse; font-size:13px; } .tbl th { text-align:right; color:var(--mut); font-weight:600; padding:6px; } .tbl td { padding:5px; } .tbl input,.tbl select { margin:0; padding:7px 8px; }
+  .canvasbox { display:grid; grid-template-columns:minmax(0,1fr) 300px; gap:16px; } @media (max-width:1100px){ .canvasbox { grid-template-columns:1fr; } }
+  .layer { display:grid; grid-template-columns:auto 1fr auto; gap:8px; align-items:center; padding:8px 10px; border:1px solid var(--line); border-radius:12px; margin-bottom:8px; background:#0a0e1c; } .layer small { color:var(--mut); }
+  .handle { position:absolute; border:2px dashed rgba(0,240,255,.8); background:rgba(0,240,255,.08); cursor:grab; display:grid; place-items:center; font-size:12px; color:#00F0FF; user-select:none; } .handle:active { cursor:grabbing; }
+  .stage.v { aspect-ratio:9/16; max-height:660px; width:auto; margin:0 auto; }
+</style>
+</head>
+<body>
+
+<section id="login">
+  <form class="box" id="lf">
+    <div style="text-align:center;margin-bottom:6px"><button type="button" class="sg-lang" onclick="SGLang.toggle()" style="background:rgba(255,255,255,.08);border:1px solid var(--line);color:var(--txt);border-radius:999px;padding:5px 14px;cursor:pointer;font:inherit;font-size:13px">English</button></div><img src="logo.png" alt="SG STREAM" width="96" height="96" style="display:block;margin:0 auto 12px"><h1 style="text-align:center">SG STREAM</h1>
+    <p id="lp">سجّل الدخول للوصول إلى لوحة التحكم</p>
+    <input id="u" placeholder="اسم المستخدم (إنجليزي، يفضّل نفس حساب TikTok)" autocomplete="username" required>
+    <input id="p" type="password" placeholder="كلمة المرور (6 أحرف على الأقل)" autocomplete="current-password" required>
+    <input id="inv" class="hidden" placeholder="كود الدعوة (من صاحب الموقع)" autocomplete="off">
+    <div id="le" style="color:#f87171;font-size:13px;min-height:18px;margin-bottom:8px"></div>
+    <button class="btn" id="lb">دخول</button>
+    <button type="button" class="btn ghost" id="lt" style="margin-top:8px">إنشاء حساب جديد</button>
+  </form>
+</section>
+
+<div id="app" class="hidden">
+  <aside>
+    <div class="grp">الرئيسية</div>
+    <button class="nav on" data-v="home">🏠 نظرة عامة</button>
+    <button class="nav" data-v="canvas">🎬 الشاشة الحية</button>
+    <div class="grp">التراكبات</div>
+    <button class="nav" data-v="overlays">✨ مكتبة القوالب</button>
+    <button class="nav" data-v="allinone">✨ الشاشة الشاملة</button>
+    <button class="nav" data-v="wheel">🎡 عجلة الحظ والتحديات</button>
+    <button class="nav" data-v="uchat">💬 الشات الموحّد</button>
+    <button class="nav" data-v="jar">🫙 الحصالة (الهدايا تتجمع)</button>
+    <button class="nav" data-v="fx">🎆 المؤثرات والألعاب النارية</button>
+    <button class="nav" data-v="goal">🎯 شريط الهدف</button>
+    <button class="nav" data-v="taps">❤️ التكبيس</button>
+    <button class="nav" data-v="alerts">🔔 محرّك التنبيهات</button>
+    <button class="nav" data-v="ticker">📜 الشريط والمتصدرين</button>
+    <button class="nav" data-v="social">🔗 ويدجت السوشيال</button>
+    <div class="grp">الذكاء والأتمتة</div>
+    <button class="nav" data-v="ai">🧠 مساعد AI</button>
+    <button class="nav" data-v="bot">🤖 روبوت الدردشة</button>
+    <button class="nav" data-v="tts">🔊 القراءة الصوتية (TTS)</button>
+    <button class="nav" data-v="games">🎮 ربط الألعاب التفاعلي</button>
+    <div class="grp">الإعدادات والربط</div>
+    <button class="nav" data-v="conn">📡 الاتصال بالبث</button>
+    <button class="nav" data-v="obs">🖥️ روابط OBS</button>
+    <button class="nav" data-v="test">🧪 اختبار الأحداث</button>
+    <div class="user"><b id="un"></b><br><button class="btn ghost sm" id="bk-save" style="margin-top:8px" title="تنزيل نسخة من كل إعداداتك">💾 نسخة احتياطية</button> <button class="btn ghost sm" id="bk-load" style="margin-top:8px" title="استرجاع إعداداتك من ملف نسخة احتياطية">📂 استرجاع</button><input type="file" id="bk-file" accept=".json,application/json" style="display:none"><br><button class="btn ghost sm" id="out" style="margin-top:8px">خروج</button></div>
+  </aside>
+  <div class="col">
+    <header id="top"><div class="brand" style="display:flex;align-items:center;gap:10px"><img src="logo.png" alt="" width="38" height="38"><span>SG <b>STREAM</b></span></div><button type="button" class="sg-lang" onclick="SGLang.toggle()" style="margin-inline-start:auto;background:rgba(255,255,255,.08);border:1px solid var(--line);color:var(--txt);border-radius:999px;padding:6px 14px;cursor:pointer;font:inherit;font-size:13px">English</button><button class="live off" id="nav-live" type="button" title="اتصال سريع بالبث">○ غير متصل بالبث</button></header>
+    <main id="main"></main>
+  </div>
+</div>
+
+<script src="shared.js"></script>
+<script>
+const $ = (s, r = document) => r.querySelector(s);
+let me = null, user = null, registering = false;
+const api = async (p, body) => {
+  let r;
+  try { r = await fetch(p, { method: body ? 'POST' : 'GET', headers: { 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined }); }
+  catch { throw new Error(location.protocol === 'file:' ? 'أنت فاتح الملف مباشرة. شغّل «Start SG STREAM» (الملف الأسود) ثم افتح http://localhost:3000 في المتصفح' : 'لا يوجد اتصال بالخادم. تأكد أن النافذة السوداء (Start SG STREAM) ما زالت مفتوحة'); }
+  const j = await r.json().catch(() => ({}));
+  if (r.status === 402 && j.error === 'PRO_REQUIRED' && typeof openPricing === 'function') openPricing('هذه الميزة للمشتركين في PRO');
+  if (r.status === 401 && j.error === 'غير مسجّل') { setTimeout(() => location.reload(), 1800); throw new Error('انتهت جلستك (الخادم أُعيد تشغيله). سجّل الدخول من جديد…'); }
+  if (!r.ok) throw new Error(j.error || 'خطأ');
+  return j;
+};
+// Refreshing the account (status polls, connect, ...) must never swap in the server's copy of the settings:
+// pages hold references into me.cfg and edits are saved with a short delay, so the local copy stays the source of truth.
+const setMe = (m) => { if (m && me && me.cfg && m.name === me.name) m = { ...m, cfg: me.cfg }; me = m; user = m ? (m.tiktok || m.name) : null; };
+let selected = store.get('lsx-selected', 'gift-rocket');
+let cat = 'all', query = '', view = 'home';
+const go = (v) => { view = v; document.querySelectorAll('.nav').forEach(x => x.classList.toggle('on', x.dataset.v === v)); render(); };
+// ---- test helpers: send sample events to local previews and to real OBS overlays ----
+const NAMES = ['سارة', 'أحمد', 'Lina', 'خالد', 'Noor'];
+const pick = () => NAMES[Math.random() * NAMES.length | 0];
+const fire = (ev) => { emit(ev); api('/api/test', ev).catch(() => {}); store.set('lsx-acted', true); };
+const SAMPLES = {
+  gift: () => ({ type: 'gift', user: pick(), gift: 'Rose', count: 1 + (Math.random() * 4 | 0), team: Math.random() < .5 ? 'A' : 'B' }),
+  follow: () => ({ type: 'follow', user: pick() }),
+  like: () => ({ type: 'like', user: pick(), count: 1 + (Math.random() * 9 | 0) }),
+  chat: () => ({ type: 'chat', user: pick(), text: 'مرحبا من البث!' }),
+  spin: () => ({ type: 'spin' }),
+  fxgift: () => ({ type: 'gift', user: pick(), gift: 'Lion', count: 1, diamonds: 29999 }),
+  jarGift: () => { const g = [['Rose', 1], ['Heart', 1], ['Lion', 29999], ['Diamond', 5], ['Rose', 1], ['Doughnut', 30]][Math.random() * 6 | 0], n = 1 + (Math.random() * 6 | 0); return { type: 'gift', user: pick(), gift: g[0], count: n, diamonds: g[1] * n }; },
+  chatTw: () => ({ type: 'chat', user: pick(), text: 'GG! رائع', platform: 'twitch', sub: Math.random() < .5 }),
+};
+const kindsFor = (tpl) => {
+  if (!tpl) return [];
+  if (tpl.only) return [tpl.only];
+  return ({ 'gift-rocket': ['gift'], 'gift-timer': ['gift'], 'goal-bar': ['gift', 'follow'], alerts: ['gift', 'follow', 'sub'], hearts: ['like'], top: [tpl.mode === 'likes' ? 'like' : 'gift'],
+    chat: ['chat'], ticker: ['gift'], recent: ['gift', 'follow', 'sub'], counter: [tpl.v === 'followers' ? 'follow' : tpl.v === 'likes' ? 'like' : 'gift'], versus: ['gift'], social: [],
+    wheel: ['spin'], jar: ['jarGift', 'jarGift', 'jarGift'], fx: ['fxgift', 'follow'], canvas: ['gift', 'follow'], tts: ['chat'], uchat: ['chat', 'chatTw', 'chat', 'chatTw'] })[tpl.view] || [];
+};
+const testTpl = (id) => { const k = kindsFor(TEMPLATES.find(x => x.id === id) || { view: id }); k.forEach((t, i) => setTimeout(() => fire(SAMPLES[t]()), i * 400)); return k.length; };
+function fitPreviews() { document.querySelectorAll('.pvbox').forEach(b => { const k = b.clientWidth / 700; const f = b.firstElementChild; if (f) f.style.transform = `scale(${k})`; }); }
+addEventListener('resize', fitPreviews);const socLinks = () => {
+  if (!me) return [];
+  if (!(me.cfg.social || []).length) { const old = store.get('lsx-soc', []); if (old.length) { me.cfg.social = old; saveCfg(); store.set('lsx-soc', []); } }
+  return me.cfg.social || [];
+};
+const ovUrl = (id) => new URL(`overlay.html?slot=${encodeURIComponent(slotKey(TEMPLATES.find(x => x.id === id) || { view: id }))}&goal=10&k=${me ? me.token : ''}`, baseUrl()).href;
+const slotCur = (key) => (me.cfg.slots || {})[key] || (TEMPLATES.find(x => slotKey(x) === key) || {}).id;
+const useTpl = (t) => { me.cfg.slots = { ...(me.cfg.slots || {}), [slotKey(t)]: t.id }; saveCfg(); };
+// address used inside OBS links, so friends get a link that opens on their machine (not localhost)
+const baseUrl = () => { try { const b = store.get('lsx-base', ''); if (b) return new URL(b.endsWith('/') ? b : b + '/'); } catch {} return new URL('./', location.href); };
+let soc = { p: 'telegram', h: '', n: '', st: 'glass', c: '', fg: '#ffffff', bg: '#080919' };
+const SWATCHES = ['#2dd4bf', '#f43f5e', '#a78bfa', '#60a5fa', '#34d399', '#fbbf24', '#f87171', '#ec4899', '#ffffff', '#000000'];
+injectSoc();
+
+function boot() {
+  $('#login').classList.toggle('hidden', !!me);
+  $('#app').classList.toggle('hidden', !me);
+  if (me) { $('#un').textContent = '@' + me.name; render(); }
+}
+api('/api/me').then(setMe).catch(() => {}).finally(boot);
+let needInvite = false;
+api('/api/info').then(i => { needInvite = !!i.invite; }).catch(() => {});
+$('#lt').onclick = () => {
+  registering = !registering;
+  $('#lb').textContent = registering ? 'إنشاء الحساب' : 'دخول';
+  $('#lt').textContent = registering ? 'لدي حساب' : 'إنشاء حساب جديد';
+  $('#inv').classList.toggle('hidden', !(registering && needInvite));
+  $('#lp').textContent = registering ? 'أنشئ حسابك المجاني' : 'سجّل الدخول للوصول إلى لوحة التحكم';
+};
+$('#lf').onsubmit = async (e) => {
+  e.preventDefault(); $('#le').textContent = '';
+  try { setMe(await api(registering ? '/api/register' : '/api/login', { name: $('#u').value, password: $('#p').value, invite: $('#inv').value })); boot(); }
+  catch (err) { $('#le').textContent = err.message; }
+};
+// backup: download every setting as a file, or restore it later (works on any server, even a fresh one after a reset)
+$('#bk-save').onclick = () => {
+  const blob = new Blob([JSON.stringify({ app: 'sg-stream', v: 1, user: me.name, saved: new Date().toISOString(), cfg: me.cfg }, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'sg-stream-backup-' + me.name + '-' + new Date().toISOString().slice(0, 10) + '.json'; document.body.appendChild(a); a.click(); a.remove();
+  toast('تم تنزيل النسخة الاحتياطية. احتفظ بها في مكان آمن');
+};
+$('#bk-load').onclick = () => $('#bk-file').click();
+$('#bk-file').onchange = async (e) => {
+  const f = e.target.files[0]; e.target.value = ''; if (!f) return;
+  try {
+    const j = JSON.parse(await f.text()); if (!j || j.app !== 'sg-stream' || !j.cfg || typeof j.cfg !== 'object') throw new Error('bad');
+    if (!confirm('سيتم استبدال إعداداتك الحالية بما في الملف. متابعة؟')) return;
+    const r = await api('/api/config', { cfg: j.cfg }); setMe(await api('/api/me')); me.cfg = r && r.cfg ? r.cfg : me.cfg; toast('تم استرجاع إعداداتك. جاري إعادة التحميل…'); setTimeout(() => location.reload(), 900);
+  } catch { toast('الملف غير صالح. اختر ملف نسخة احتياطية من SG STREAM', 'warn'); }
+};
+$('#out').onclick = async () => { await api('/api/logout', {}).catch(() => {}); setMe(null); boot(); };
+document.querySelectorAll('.nav').forEach(b => b.onclick = () => {
+  view = b.dataset.v; document.querySelectorAll('.nav').forEach(x => x.classList.toggle('on', x === b)); render();
+});
+const copy = async (t, btn) => {
+  let ok = false;
+  try { await navigator.clipboard.writeText(t); ok = true; } catch {
+    const ta = document.createElement('textarea'); ta.value = t; ta.style.cssText = 'position:fixed;opacity:0;top:0'; document.body.appendChild(ta); ta.select();
+    try { ok = document.execCommand('copy'); } catch {} ta.remove();
+  }
+  if (!ok) { // last resort: show the link so it can be copied by hand
+    document.getElementById('copy-fallback')?.remove();
+    const d = document.createElement('div'); d.id = 'copy-fallback';
+    d.style.cssText = 'position:fixed;inset:auto 20px 20px 20px;z-index:50;background:#0d1326;border:1px solid var(--a);border-radius:14px;padding:14px;box-shadow:0 0 30px #000';
+    d.innerHTML = `<div style="margin-bottom:8px">تعذّر النسخ تلقائياً. حدّد الرابط وانسخه (Ctrl+C):</div><input readonly dir="ltr" value="${esc(t)}" style="width:100%;margin:0"><button class="btn ghost sm" style="margin-top:8px">إغلاق</button>`;
+    document.body.appendChild(d); const i = d.querySelector('input'); i.focus(); i.select(); d.querySelector('button').onclick = () => d.remove();
+  }
+  if (btn) { const o = btn.textContent; btn.textContent = ok ? 'تم النسخ ✓' : 'انسخه من الأسفل'; setTimeout(() => btn.textContent = o, 1500); }
+  return ok;
+};
+// copy + tell the truth: a green toast only when the clipboard really got the link
+const copyLink = async (text, okMsg) => { const ok = await copy(text); toast(ok ? okMsg : 'تعذّر النسخ تلقائياً. انسخ الرابط من المربع اللي ظهر تحت', ok ? 'ok' : 'warn', ok ? 3600 : 6000); return ok; };
+const esc = (s) => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+const EXTRA = {}; // pages defined in views2.js
+const loginTitle = document.querySelector('#lf h1'); if (loginTitle) loginTitle.textContent = 'SG STREAM';
+function updateNav() {
+  if (typeof proNavSync === 'function') proNavSync();
+  const n = $('#nav-live'); if (!n || !me) return;
+  const tw = me.twitch || {}, kk = me.kick || {}, tt = !!me.connected, twOn = !!tw.connected, kkOn = !!kk.connected, retry = (!tt && me.reconnecting) || (!twOn && tw.reconnecting) || (!kkOn && kk.reconnecting);
+  n.className = 'live ' + (tt || twOn || kkOn ? 'on' : 'off');
+  const parts = []; if (tt) parts.push(`<span class="pdot">🟢</span> TikTok <span dir="ltr">@${esc(me.tiktok)}</span>`); if (twOn) parts.push(`<span class="pdot">🟣</span> Twitch <span dir="ltr">#${esc(tw.channel)}</span>`); if (kkOn) parts.push(`<span class="pdot">🟩</span> Kick <span dir="ltr">${esc(kk.channel)}</span>`);
+  n.innerHTML = parts.length > 1 ? parts.join(' · ') : tt ? `<span class="pdot">🟢</span> متصل ببث: <span dir="ltr">@${esc(me.tiktok)}</span>`
+    : twOn ? `<span class="pdot">🟣</span> متصل ببث تويتش: <span dir="ltr">#${esc(tw.channel)}</span>`
+    : kkOn ? `<span class="pdot">🟩</span> متصل ببث كيك: <span dir="ltr">${esc(kk.channel)}</span>`
+    : retry ? '🟡 يعيد الاتصال بالبث…' : '○ غير متصل بالبث';
+  n.onclick = () => openConnect();
+  const s = me.stats || {};
+  [['st-f', s.followers], ['st-w', s.watching], ['st-g', s.gifts], ['st-c', s.chats]].forEach(([id, v]) => { const e = document.getElementById(id); if (e) e.textContent = v ?? 0; });
+}
+setInterval(() => { if (me) api('/api/me').then(m => { m.cfg = me.cfg; setMe(m); updateNav(); }).catch(() => {}); }, 4000);
+let statusTimer = null;
+function startStatus() {
+  const draw = async () => {
+    const box = $('#vw'); if (!box) { clearInterval(statusTimer); return; }
+    try { setMe(await api('/api/me')); } catch { box.innerHTML = '<span class="tag" style="background:#3a1620;color:#f87171">● الخادم غير متصل</span>'; return; }
+    box.innerHTML = `<span class="tag" style="background:#12332b;color:#5eead4">● الخادم يعمل</span>
+      <span class="tag" style="${me.connected ? 'background:#12332b;color:#5eead4' : 'background:#3a2a10;color:#fbbf24'}">${me.connected ? '● متصل ببث TikTok' : '○ TikTok غير متصل'}</span>
+      <span class="tag" style="${me.viewers ? 'background:#12332b;color:#5eead4' : 'background:#3a2a10;color:#fbbf24'}">${me.viewers ? `● شاشات OBS المتصلة: ${me.viewers}` : '○ لا توجد شاشة OBS مفتوحة'}</span>`;
+  };
+  clearInterval(statusTimer); draw(); statusTimer = setInterval(draw, 3000);
+}
+function render() {
+  clearInterval(statusTimer); document.getElementById('copy-fallback')?.remove();
+  const m = $('#main');
+  updateNav();
+  if (EXTRA[view]) { EXTRA[view](m); return; }
+  if (view === 'overlays') {
+    store.set('lsx-cfg', me.cfg); // the preview frames read the saved settings (custom looks, wheel, taps...)
+    const visible = TEMPLATES.filter(t => !t.hidden);
+    const list = visible.filter(t => (cat === 'all' || t.cat === cat) && (t.name + t.desc + (CATS.find(c => c[0] === t.cat) || [, ''])[1]).toLowerCase().includes(query.toLowerCase()));
+    m.innerHTML = `
+      <div class="top srch"><div><h2>مكتبة شاشات البث (Overlays)</h2><div class="sub" style="margin-bottom:0">أكثر من 81 قالباً تفاعلياً جاهزاً للربط الفوري مع بثك في TikTok LIVE</div></div>
+      <input id="q" placeholder="ابحث عن القوالب…" value="${esc(query)}"></div>
+      <div class="chips">${CATS.map(([k, n]) => `<button class="chip ${k === cat ? 'on' : ''}" data-c="${k}">${n}</button>`).join('')}</div>
+      <div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(310px,1fr))">${list.map(t => `
+        <div class="tpl ${t.id === slotCur(slotKey(t)) ? 'sel' : ''}" data-id="${t.id}">
+          <div class="pvbox"><iframe src="overlay.html?t=${t.id}&demo=1" loading="lazy"></iframe></div>
+          <div class="bd"><div class="row" style="justify-content:space-between"><h4>${t.name}</h4><span class="stat-badge">${t.id === slotCur(slotKey(t)) ? '<span class="tag live-tag">• مُفعل في OBS</span>' : t.sub ? '<span class="tag">المشتركين</span>' : ''}</span></div>
+          <p>${t.desc}</p>
+          <div class="acts"><button class="btn glow cta" data-cp="${t.id}">🔗 نسخ رابط OBS</button><button class="btn ghost sm" data-cz="${t.id}">⚙️ تخصيص</button><button class="btn ghost sm" data-sim="${t.id}">⚡ محاكاة حية</button></div></div>
+        </div>`).join('') || '<div class="sub">لا توجد نتائج</div>'}</div>`;
+    $('#q').oninput = (e) => { query = e.target.value; render(); $('#q').focus(); $('#q').setSelectionRange(query.length, query.length); };
+    m.querySelectorAll('[data-c]').forEach(b => b.onclick = () => { cat = b.dataset.c; render(); });
+    const tplOf = (id) => TEMPLATES.find(x => x.id === id);
+    m.querySelectorAll('[data-cp]').forEach(b => b.onclick = () => {
+      const t = tplOf(b.dataset.cp); selected = t.id; store.set('lsx-selected', selected); store.set('lsx-obs', true);
+      useTpl(t); refreshBadges(); copyLink(ovUrl(t.id), '✅ تم نسخ رابط القالب بنجاح! ضعه في متصفح OBS');
+    });
+    m.querySelectorAll('[data-cz]').forEach(b => b.onclick = () => openCustomize(tplOf(b.dataset.cz)));
+    m.querySelectorAll('[data-sim]').forEach(b => b.onclick = () => runSim(tplOf(b.dataset.sim), b, b.closest('.tpl').querySelector('iframe')));
+    fitPreviews();
+  } else if (view === 'obs') {
+    m.innerHTML = `<h2>روابط OBS الدائمة</h2><div class="sub">رابط واحد لكل نوع تراكب، تحطه في OBS مرة واحدة ولا تغيّره. الشكل والألوان والنصوص تغيّرها من هنا وتنعكس في OBS تلقائياً.</div>
+      <div class="panel"><h3>حالة الاتصال</h3><div id="vw" class="row"></div></div>
+      <div class="panel"><h3>الروابط</h3>${SLOTS.map(k => { const t = TEMPLATES.find(x => x.id === slotCur(k)); return `<div style="margin-bottom:14px"><div class="row" style="justify-content:space-between"><div><b>${SLOT_LABELS[k] || k}</b> <span class="sub" style="margin:0">القالب الحالي: ${t ? t.name : '—'}</span></div>
+        <div class="row"><button class="btn ghost sm" data-t="${t.id}">🧪 تجربة</button><button class="btn sm" data-cp="${t.id}">نسخ الرابط</button></div></div><code>${ovUrl(t.id)}</code></div>`; }).join('')}</div>`;
+    m.querySelectorAll('[data-cp]').forEach(b => b.onclick = () => { store.set('lsx-obs', true); copy(ovUrl(b.dataset.cp), b); });
+    m.querySelectorAll('[data-t]').forEach(b => b.onclick = () => { const n = testTpl(b.dataset.t); const o = b.textContent; b.textContent = n ? 'أُرسل ✓' : 'يتبدّل تلقائياً'; setTimeout(() => b.textContent = o, 1200); });
+    startStatus();
+  } else if (view === 'social') {
+    const links = socLinks();
+    const accent = soc.c || PLATFORMS[soc.p][2];
+    m.innerHTML = `<h2>ويدجت السوشيال</h2><div class="sub">أضف حساباتك واختر الشكل، وتتبدّل على الشاشة تلقائياً</div>
+      <div class="panel"><h3>إضافة رابط سوشيال</h3>
+        <div class="row" style="margin-bottom:10px"><select id="sp" style="padding:10px;background:#0a0e1c;color:var(--txt);border:1px solid var(--line);border-radius:10px;font:inherit">
+          ${Object.entries(PLATFORMS).map(([k, v]) => `<option value="${k}" ${k === soc.p ? 'selected' : ''}>${v[0]}</option>`).join('')}</select>
+          ${soc.p === 'custom' ? `<input id="sn" placeholder="اسم المنصة" value="${esc(soc.n)}" style="width:180px;margin:0">` : ''}
+          <input id="sh" placeholder="@your_name" value="${esc(soc.h)}" dir="ltr" style="width:220px;margin:0"></div>
+        <h3 style="margin-top:16px">قالب العرض</h3>
+        <div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px">${SOC_STYLES.map(([k, n]) => `
+          <button class="tpl ${k === soc.st ? 'sel' : ''}" data-st="${k}" style="padding:14px 8px;text-align:center;color:inherit;background:#070a14">
+            <div style="transform:scale(.55);transform-origin:center;height:60px;display:grid;place-items:center">${socHTML({ ...soc, st: k, h: soc.h || '@preview' })}</div><small style="color:var(--mut)">${n}</small></button>`).join('')}</div>
+        <h3 style="margin-top:16px">لون الثيم</h3>
+        <div class="row">${SWATCHES.map(c => `<button data-sw="${c}" title="${c}" style="width:28px;height:28px;border-radius:50%;border:2px solid ${c === accent ? '#fff' : 'transparent'};background:${c}"></button>`).join('')}
+          <input type="color" id="sc1" value="${accent}" style="width:44px;height:32px;padding:0;margin:0">
+          <button class="btn ghost sm" id="sauto">تلقائي (لون المنصة)</button></div>
+        <div class="row" style="margin-top:12px"><label>لون النص <input type="color" id="sf" value="${soc.fg}" style="width:44px;height:30px;padding:0;margin:0"></label>
+          <label>لون الخلفية <input type="color" id="sb" value="${soc.bg}" style="width:44px;height:30px;padding:0;margin:0"></label></div>
+        <h3 style="margin-top:16px">معاينة مباشرة</h3>
+        <div style="background:#070a14;border:1px solid var(--line);border-radius:12px;padding:30px;display:grid;place-items:center">${socHTML({ ...soc, h: soc.h || '@your_name' })}</div>
+        <div class="row" style="margin-top:14px"><button class="btn sm" id="sadd">إضافة رابط</button></div></div>
+      <div class="panel"><h3>روابطك (${links.length})</h3>
+        ${links.map((l, i) => `<div class="row" style="justify-content:space-between;margin-bottom:8px"><span>${PLATFORMS[l.p][0]} — <span dir="ltr">${esc(l.h)}</span></span><button class="btn ghost sm" data-rm="${i}">حذف</button></div>`).join('') || '<div class="sub" style="margin:0">لا توجد روابط بعد.</div>'}
+        ${links.length ? `<code>${ovUrl('social')}</code><button class="btn sm" id="scp">نسخ رابط OBS</button>` : ''}</div>`;
+    const keep = (fn) => (e) => { fn(e); render(); };
+    $('#sp').onchange = keep(e => { soc.p = e.target.value; });
+    if ($('#sn')) $('#sn').oninput = (e) => { soc.n = e.target.value; };
+    $('#sh').oninput = (e) => { soc.h = e.target.value; };
+    $('#sh').onchange = () => render();
+    m.querySelectorAll('[data-st]').forEach(b => b.onclick = () => { soc.st = b.dataset.st; render(); });
+    m.querySelectorAll('[data-sw]').forEach(b => b.onclick = () => { soc.c = b.dataset.sw; render(); });
+    $('#sc1').onchange = (e) => { soc.c = e.target.value; render(); };
+    $('#sauto').onclick = () => { soc.c = ''; render(); };
+    $('#sf').onchange = (e) => { soc.fg = e.target.value; render(); };
+    $('#sb').onchange = (e) => { soc.bg = e.target.value; render(); };
+    $('#sadd').onclick = () => { if (!soc.h.trim()) { $('#sh').focus(); return; } me.cfg.social = [...links, { ...soc, h: soc.h.trim() }]; saveCfg(); soc.h = ''; render(); };
+    m.querySelectorAll('[data-rm]').forEach(b => b.onclick = () => { links.splice(b.dataset.rm, 1); me.cfg.social = links; saveCfg(); render(); });
+    if ($('#scp')) $('#scp').onclick = (e) => { store.set('lsx-obs', true); copy(ovUrl('social'), e.target); };
+  } else if (view === 'conn') {
+    const tw = me.twitch || {}, kk = me.kick || {};
+    const card = (icon, name, on, retry, who, tab, color) => `<div class="panel" style="border-color:${on ? color : 'var(--line)'}"><div class="row" style="justify-content:space-between"><h3 style="margin:0">${icon} ${name}</h3>
+      <span class="tag" style="${on ? 'background:#12332b;color:#5eead4' : retry ? 'background:#3a2a10;color:#fbbf24' : ''}">${on ? '● متصل' : retry ? '🟡 يعيد الاتصال' : 'غير متصل'}</span></div>
+      <div class="sub" style="margin:10px 0">${on ? `الحساب: <b dir="ltr">${esc(who)}</b>` : 'ما فيه اتصال'}</div><button class="btn ${tab === 'twitch' ? 'tw' : tab === 'kick' ? 'kk' : 'glow'} sm" data-hub="${tab}">${on ? 'إدارة الاتصال' : 'اتصال'}</button></div>`;
+    m.innerHTML = `<h2>الاتصال بالبث</h2><div class="sub">اربط تيك توك أو تويتش أو كيك (أو كلهم مع بعض). الأحداث تتفاعل مع كل القوالب والتنبيهات وعجلة الحظ والقارئ الصوتي وجسر الألعاب.</div>
+      <div class="canvasbox" style="grid-template-columns:repeat(auto-fit,minmax(240px,1fr))">${card('🎵', 'TikTok LIVE', !!me.connected, !!me.reconnecting, '@' + (me.tiktok || ''), 'tiktok', '#14b8a6')}${card('🟣', 'Twitch', !!tw.connected, !!tw.reconnecting, '#' + (tw.channel || ''), 'twitch', '#9146ff')}${card('🟩', 'Kick', !!kk.connected, !!kk.reconnecting, kk.channel || '', 'kick', '#53fc18')}</div>`;
+    m.querySelectorAll('[data-hub]').forEach(b => b.onclick = () => openConnect(b.dataset.hub));
+    const cur = store.get('lsx-base', '');
+    if (me.invite) m.insertAdjacentHTML('beforeend', `<div class="panel"><h3>كود الدعوة</h3><div class="sub" style="margin-top:0">أعطِ هذا الكود لأي شخص تبيه ينشئ حساب على موقعك:</div><code style="font-size:20px">${esc(me.invite)}</code></div>`);
+    m.insertAdjacentHTML('beforeend', `<div class="panel"><h3>عنوان الموقع في روابط OBS</h3>
+      <div class="sub" style="margin-top:0">الروابط تُنسخ بهذا العنوان. لو أصدقاؤك يفتحونها من جهاز ثاني، لازم يكون عنواناً يوصلون له (مو localhost).</div>
+      <input id="bu" dir="ltr" placeholder="https://your-site.com" value="${esc(cur)}" style="max-width:420px">
+      <div class="row"><button class="btn sm" id="bs">حفظ</button><button class="btn ghost sm" id="bc">استخدم العنوان الحالي</button><span id="bm" class="sub" style="margin:0"></span></div>
+      <div id="lan" class="row" style="margin-top:10px"></div>
+      <div class="sub" style="margin:10px 0 0">الرابط الحالي لقالب: <span dir="ltr" style="unicode-bidi:isolate">${esc(ovUrl('goal-bar').slice(0, 70))}…</span>${/localhost|127\.0\.0\.1/.test(ovUrl('goal-bar')) ? ' <b style="color:#fbbf24">⚠ هذا العنوان يعمل على جهازك فقط</b>' : ''}</div></div>`);
+    $('#bs').onclick = () => { store.set('lsx-base', $('#bu').value.trim()); $('#bm').textContent = 'تم الحفظ ✓'; render(); };
+    $('#bc').onclick = () => { store.set('lsx-base', ''); render(); };
+    api('/api/net').then(n => { const l = $('#lan'); if (l) l.innerHTML = n.ips.length ? '<span class="sub" style="margin:0">على نفس الشبكة (واي فاي):</span>' + n.ips.map(ip => `<button class="btn ghost sm" data-ip="http://${ip}:${n.port}">http://${ip}:${n.port}</button>`).join('') : ''; l?.querySelectorAll('[data-ip]').forEach(b => b.onclick = () => { $('#bu').value = b.dataset.ip; }); }).catch(() => {});
+  } else {
+    const t = TEMPLATES.find(x => x.id === selected);
+    const done = [!!(me.connected || (me.twitch && me.twitch.connected) || (me.kick && me.kick.connected)), !!t, !!store.get('lsx-acted', false), !!store.get('lsx-obs', false)];
+    const steps = [
+      ['اربط حسابك (TikTok أو Twitch أو Kick)', me.connected ? `TikTok @${user} متصل` : (me.twitch && me.twitch.connected) ? `Twitch #${me.twitch.channel} متصل` : (me.kick && me.kick.connected) ? `Kick ${me.kick.channel} متصل` : 'اضغط الزر بالأعلى واتصل ببثك', 'conn'],
+      ['جهّز توبيك من القوالب', t ? `لديك توبيك جاهز: ${t.name}` : 'اختر قالباً', 'overlays'],
+      ['أنشئ إجراء', 'اربط الهدية أو التعليق بتنبيه أو رسالة (جرّبه من الاختبار).', 'test'],
+      ['وابدأ OBS ضع مصدر', 'انسخ رابط الشاشة وأضفه كـ Browser Source بمقاس 1920×1080.', 'obs'],
+    ];
+    const next = done.indexOf(false);
+    const tools = [['🔊', 'الأصوات والتنبيهات', 'ملف صوتي لكل حدث', 'test'], ['🗣️', 'TTS قارئ النصوص', 'قراءة التعليقات والهدايا', 'test'],
+      ['🔗', 'ويدجت السوشيال', 'حساباتك على الشاشة', 'overlays'], ['🎮', 'الألعاب التفاعلية', 'ألعاب تعتمد على التعليقات', 'overlays'],
+      ['🤖', 'الشات بوت', 'أوامر وردود جاهزة', 'bot'], ['🎵', 'طلبات الأغاني', 'طلبات وتشغيل للمشاهدين', 'test'],
+      ['🖼️', 'استوديو النص والصورة', 'لوحات نصية وصور جاهزة', 'overlays'], ['🖥️', 'نوافذ OBS', 'روابط الشاشة جاهزة', 'obs']];
+    const st = me.stats || {};
+    m.innerHTML = `
+      <div class="stat" style="margin-bottom:16px">
+        <div><small style="color:var(--mut)">متابعون جدد</small><b id="st-f" style="color:var(--a)">${st.followers || 0}</b></div>
+        <div><small style="color:var(--mut)">المشاهدات الحالية</small><b id="st-w" style="color:var(--b)">${st.watching || 0}</b></div>
+        <div><small style="color:var(--mut)">إجمالي الهدايا</small><b id="st-g" style="color:var(--p)">${st.gifts || 0}</b></div>
+        <div><small style="color:var(--mut)">رسائل الشات</small><b id="st-c">${st.chats || 0}</b></div></div>
+      <div class="panel" style="padding:0;overflow:hidden">
+        <div style="padding:26px 28px;display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;align-items:center">
+          <div><small style="color:var(--mut)">لوحة البداية</small><h2 style="font-size:32px;margin:6px 0">أهلاً بك في SG STREAM</h2>
+          <div class="sub" style="margin:0;max-width:520px">استوديو بث TikTok LIVE: توبيكات وإجراءات وأصوات تشتغل لحظة ما تصل الهدية أو التعليق. أربع خطوات تفصلك عن أول بث متكامل.</div></div>
+          <div class="row"><button class="btn ghost sm" data-g="obs">دليل الإعداد</button><button class="btn sm" data-g="test">أنشئ إجراء</button></div></div>
+        <div class="stat" style="border-top:1px solid var(--line);gap:0">
+          <div style="border:0"><small style="color:var(--mut)">حساب TikTok</small><b style="font-size:20px;direction:ltr;text-align:right">@${esc(user)}</b></div>
+          <div style="border:0"><small style="color:var(--mut)">التويبكات</small><b style="color:var(--b)">${t ? 1 : 0}</b></div>
+          <div style="border:0"><small style="color:var(--mut)">الإجراءات</small><b>${store.get('lsx-acted', false) ? 1 : 0}</b></div></div></div>
+      <h3 style="margin:22px 0 4px">طريق التجهيز</h3><div class="sub">${done.filter(Boolean).length} من 4 — كل خطوة تفتح الصفحة التي تنفذها فعلاً.</div>
+      <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(220px,1fr))">${steps.map((s, i) => `
+        <div class="tpl ${i === next ? 'sel' : ''}"><div class="bd"><small style="color:${done[i] ? 'var(--a)' : 'var(--mut)'}">الخطوة ${i + 1} • ${done[i] ? '✓ مكتملة' : i === next ? 'التالية' : 'لاحقاً'}</small>
+          <h4 style="margin:8px 0 4px">${s[0]}</h4><p>${s[1]}</p><button class="btn ghost sm" data-g="${s[2]}">${done[i] ? 'مراجعة' : 'افتح'}</button></div></div>`).join('')}</div>
+      <h3 style="margin:26px 0 4px">بقيّة الأدوات</h3><div class="sub">ليست مطلوبة للبدء — افتحها بعد أن يعمل أول بث.</div>
+      <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(220px,1fr))">${tools.map(x => `
+        <button class="tpl" data-g="${x[3]}" style="text-align:right;color:inherit;padding:14px"><b>${x[0]} ${x[1]}</b><p style="margin:4px 0 0">${x[2]}</p></button>`).join('')}</div>
+      <div class="panel" style="margin-top:22px"><h3>الشرح والمساعدة</h3><span class="sub">دليل الإعداد، الدروس، حل المشاكل، الدعم والاشتراك.</span></div>`;
+    m.querySelectorAll('[data-g]').forEach(b => b.onclick = () => go(b.dataset.g));
+  }
+}
+boot();
+</script>
+<script src="ui.js"></script>
+<script src="views2.js"></script>
+<script src="views3.js"></script>
+<script src="views4.js"></script>
+<script src="views5.js"></script>
+</body>
+</html>

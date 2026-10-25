@@ -1,0 +1,27 @@
+services:
+  - type: web
+    name: sg-stream
+    runtime: docker
+    plan: free
+    healthCheckPath: /
+    envVars:
+      - key: UPSTASH_REDIS_REST_URL
+        sync: false        # Render asks you for this value during setup (free Redis from upstash.com)
+      - key: UPSTASH_REDIS_REST_TOKEN
+        sync: false
+      - key: SESSION_SECRET
+        generateValue: true   # keeps login cookies valid across restarts
+      - key: ADMIN_USER
+        sync: false        # optional: the username that owns the site (otherwise the first account to register is the owner)
+      - key: MAX_CONNECTIONS
+        value: "25"        # simultaneous TikTok + Twitch connections this free instance will accept
+      - key: MAX_USERS
+        value: "300"
+      - key: TWITCH_CLIENT_ID
+        sync: false        # optional: enables followers + Channel Points (dev.twitch.tv/console, redirect URL = https://YOUR-SITE/auth/twitch/callback)
+      - key: TWITCH_CLIENT_SECRET
+        sync: false
+      - key: KICK_CLIENT_ID
+        sync: false        # optional: Kick (dev.kick.com). Redirect URL https://YOUR-SITE/auth/kick/callback, webhook URL https://YOUR-SITE/kick/webhook
+      - key: KICK_CLIENT_SECRET
+        sync: false

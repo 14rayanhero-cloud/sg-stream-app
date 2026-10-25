@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <defs>
+    <radialGradient id="bg" cx="35%" cy="30%" r="90%"><stop offset="0" stop-color="#10224a"/><stop offset="1" stop-color="#040815"/></radialGradient>
+    <radialGradient id="flare" cx="100%" cy="30%" r="60%"><stop offset="0" stop-color="#ffffff" stop-opacity=".95"/><stop offset=".25" stop-color="#5aa9ff" stop-opacity=".7"/><stop offset="1" stop-color="#3b82f6" stop-opacity="0"/></radialGradient>
+    <linearGradient id="pk" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ff3fd8"/><stop offset="1" stop-color="#ff2d8a"/></linearGradient>
+    <linearGradient id="cy" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#22d3ee"/><stop offset="1" stop-color="#3b82f6"/></linearGradient>
+    <clipPath id="L"><rect x="0" y="0" width="64" height="128"/></clipPath>
+    <clipPath id="R"><rect x="64" y="0" width="64" height="128"/></clipPath>
+    <filter id="glow" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="3.2" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <path id="shield" d="M64 24 L100 38 V70 C100 92 83 106 64 115 C45 106 28 92 28 70 V38 Z"/>
+  </defs>
+  <rect width="128" height="128" rx="30" fill="url(#bg)"/>
+  <rect width="128" height="128" rx="30" fill="url(#flare)"/>
+  <g filter="url(#glow)">
+    <use href="#shield" fill="url(#pk)" clip-path="url(#L)"/>
+    <use href="#shield" fill="url(#cy)" clip-path="url(#R)"/>
+    <path d="M50 27 L64 11 L78 27 L64 22 Z" fill="#8b9cff" opacity=".85"/>
+  </g>
+  <rect x="62.5" y="24" width="3" height="91" fill="#0a1226" opacity=".55"/>
+  <text x="46" y="82" text-anchor="middle" font-family="'Arial Black','Segoe UI',Impact,sans-serif" font-weight="900" font-size="40" fill="#0a1226">S</text>
+  <text x="82" y="82" text-anchor="middle" font-family="'Arial Black','Segoe UI',Impact,sans-serif" font-weight="900" font-size="40" fill="#0a1226">G</text>
+</svg>

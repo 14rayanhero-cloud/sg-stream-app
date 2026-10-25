@@ -1,0 +1,1 @@
+{"name":"sg-stream","version":"1.0.0","private":true,"type":"commonjs","scripts":{"start":"node server.js"},"dependencies":{"msedge-tts":"^2.1.0","tiktok-live-connector":"^2.5.0","ws":"^8.22.0"}}

@@ -1,0 +1,957 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Overlay</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&display=swap">
+<style>
+  * { box-sizing:border-box; }
+  body { margin:0; background:transparent; font-family:'Cairo','Segoe UI',Tahoma,sans-serif; color:#fff; overflow:hidden; }
+  #root { position:absolute; inset:0; padding:20px; }
+  #root > * { margin-right:auto; } /* RTL page: keep overlays at the left edge of the OBS canvas */
+  .card { background:rgba(10,14,26,var(--bgA,.82)); border:1px solid rgba(255,255,255,.12); border-radius:16px; padding:14px 18px; backdrop-filter:blur(6px); }
+  .row { display:flex; justify-content:space-between; gap:12px; padding:4px 0; }
+  .bar { height:16px; border-radius:99px; background:rgba(255,255,255,.12); overflow:hidden; }
+  .bar > i { display:block; height:100%; width:0; transition:width .6s; }
+  @keyframes mq { to { transform:translateX(-100%); } }
+  @keyframes drop { from { opacity:0; transform:translateY(-30px) scale(.9); } }
+  @keyframes slide { from { opacity:0; transform:translateX(24px); } }
+  @keyframes rise { from { opacity:1; transform:translateY(0) scale(.6); } to { opacity:0; transform:translateY(-420px) scale(1.4); } }
+  @keyframes pulse { 50% { transform:scale(1.04); } }
+  .pop { position:absolute; top:30px; left:50%; transform:translateX(-50%) scale(.6); opacity:0; transition:.35s; font-size:26px; font-weight:800; text-align:center; }
+  .pop.on { opacity:1; transform:translateX(-50%) scale(1); }
+  /* timers */
+  .timer { font:900 76px/1 'Cairo',Consolas,monospace; text-align:center; --c:#fbbf24; color:var(--c); text-shadow:0 0 18px var(--c); font-variant-numeric:tabular-nums; }
+  .timer.neon { --c:#00F0FF; } .timer.fire { --c:#ff7a18; }
+  /* alert cards */
+  .alc { min-width:400px; max-width:760px; text-align:center; padding:18px 26px; font-size:28px; font-weight:800; animation:var(--in,drop .5s); --c:#00F0FF; }
+  /* entry animations chosen in the customise drawer */
+  .an-slide { --in:drop .5s; } .an-zoom { --in:zoomIn .5s; } .an-bounce { --in:bounceIn .8s; } .an-flip { --in:flipIn .7s; } .an-fade { --in:fadeIn .7s; }
+  @keyframes zoomIn { from { opacity:0; transform:scale(.3); } }
+  @keyframes bounceIn { 0% { opacity:0; transform:translateY(-120px); } 55% { opacity:1; transform:translateY(14px); } 75% { transform:translateY(-8px); } 100% { transform:none; } }
+  @keyframes flipIn { from { opacity:0; transform:perspective(600px) rotateX(-90deg); } }
+  @keyframes fadeIn { from { opacity:0; } }
+  @keyframes entSlide { from { opacity:0; transform:translateX(60px); } } @keyframes entZoom { from { opacity:0; transform:scale(.4); } }
+  @keyframes entBounce { 0% { opacity:0; transform:translateY(-40px); } 60% { opacity:1; transform:translateY(8px); } 100% { transform:none; } }
+  @keyframes entFlip { from { opacity:0; transform:perspective(500px) rotateX(-80deg); } } @keyframes entFade { from { opacity:0; } }
+  @keyframes giftRise { 0% { opacity:0; transform:translateY(0) scale(.5); } 15% { opacity:1; } 60% { transform:translateY(-300px) scale(1.25); } 100% { opacity:0; transform:translateY(-460px) scale(1); } }
+  .ent-slide { animation:entSlide .5s; } .ent-zoom { animation:entZoom .5s; } .ent-bounce { animation:entBounce .7s; } .ent-flip { animation:entFlip .6s; } .ent-fade { animation:entFade .6s; }
+  .toprow { position:absolute; left:0; right:0; height:46px; transition:top .65s cubic-bezier(.2,.8,.2,1), opacity .4s, transform .5s; }
+  .toprow .sc { display:inline-block; }
+  .toprow .bump { animation:pulse .45s; }
+  .alc img { max-height:170px; max-width:100%; border-radius:12px; display:block; margin:0 auto 10px; }
+  .al-neon { background:rgba(8,10,24,.9); border:2px solid var(--c); border-radius:18px; box-shadow:0 0 30px color-mix(in srgb,var(--c) 70%,transparent),inset 0 0 20px color-mix(in srgb,var(--c) 25%,transparent); }
+  .al-glass { background:rgba(255,255,255,.1); backdrop-filter:blur(14px); border:1px solid rgba(255,255,255,.35); border-radius:30px; box-shadow:0 10px 40px color-mix(in srgb,var(--c) 45%,transparent); }
+  .al-comic { background:var(--c); color:#111; border:5px solid #111; border-radius:6px; box-shadow:8px 8px 0 #111; transform:rotate(-2deg); font-weight:900; }
+  .al-cyber { background:#070b16; border-inline:5px solid var(--c); border-radius:0; clip-path:polygon(18px 0,100% 0,100% calc(100% - 18px),calc(100% - 18px) 100%,0 100%,0 18px); letter-spacing:1px; text-shadow:0 0 12px var(--c); }
+  .al-minimal { background:transparent; border-bottom:4px solid var(--c); border-radius:0; font-size:36px; text-shadow:0 2px 12px #000; }
+  .al-gold { background:linear-gradient(135deg,#2a1d04,#120d02); color:#fde68a; border:2px solid #fbbf24; border-radius:14px; box-shadow:0 0 26px rgba(251,191,36,.55); }
+  .al-laser { background:#06060f; border:0; border-radius:4px; box-shadow:0 0 0 2px var(--c),0 0 28px var(--c); background-image:linear-gradient(100deg,transparent 40%,color-mix(in srgb,var(--c) 55%,transparent) 50%,transparent 60%); background-size:250% 100%; animation:var(--in,drop .5s),sweep 1.6s linear infinite; }
+  @keyframes sweep { from { background-position:200% 0; } to { background-position:-100% 0; } }
+  .al-liquid { background:linear-gradient(135deg,#f8f8fa,#8c8f9a 40%,#e9ebf2 60%,#6b6f7c); color:#14161c; border-radius:40px 14px 40px 14px; border:2px solid #fff; box-shadow:0 8px 30px rgba(0,0,0,.5),inset 0 0 18px #fff9; text-shadow:0 1px 0 #fff8; }
+  .al-coins { background:radial-gradient(circle at 20% 20%,#ffe27a,#d89a00 55%,#6b4300); color:#2b1a00; border-radius:60px; border:3px solid #fff0a0; box-shadow:0 0 30px #f5b80099; }
+  .al-coins::before { content:'🪙'; margin-inline-end:10px; display:inline-block; animation:spin 1.4s linear infinite; }
+  @keyframes spin { to { transform:rotateY(360deg); } }
+  .al-heartbeat { background:rgba(20,6,12,.92); border:2px solid var(--c); border-radius:26px; box-shadow:0 0 30px var(--c); animation:var(--in,drop .5s),beat 1s .5s infinite; }
+  .al-heartbeat::before { content:'❤'; color:var(--c); margin-inline-end:10px; }
+  @keyframes beat { 0%,100% { transform:scale(1); } 15% { transform:scale(1.07); } 30% { transform:scale(1); } 45% { transform:scale(1.05); } }
+  .al-fire { background:linear-gradient(0deg,#ff4500,#ff9a1f 40%,#2a0800 100%); color:#fff7e0; border-radius:16px 16px 40px 40px; border:2px solid #ffb347; box-shadow:0 -10px 40px #ff6a0099; text-shadow:0 0 12px #ff3d00; }
+  .al-hologram { background:linear-gradient(180deg,color-mix(in srgb,var(--c) 28%,transparent),color-mix(in srgb,var(--c) 6%,transparent)); background-image:repeating-linear-gradient(0deg,transparent 0 3px,#ffffff12 3px 4px); border:1px solid var(--c); border-radius:6px; box-shadow:0 0 24px var(--c); text-shadow:0 0 10px var(--c); animation:var(--in,drop .5s),flick 2.4s infinite; }
+  @keyframes flick { 0%,92%,100% { opacity:1; } 94% { opacity:.55; } 96% { opacity:.9; } }
+  .al-lightning { background:#05060d; border:2px solid #cfe3ff; border-radius:8px; box-shadow:0 0 12px #fff,0 0 36px #6aa8ff; text-shadow:0 0 14px #6aa8ff; animation:var(--in,drop .5s),zap 1.2s infinite; }
+  @keyframes zap { 0%,90%,100% { filter:none; } 92% { filter:brightness(2.2); } 95% { filter:brightness(1); } 97% { filter:brightness(2.6); } }
+  .al-lantern,.al-mosque,.al-lattice,.al-tasbih,.al-manuscript,.al-stardust { font-family:'Cairo','Amiri',serif; color:#fff3c9; border-radius:22px; }
+  .al-lantern { background:linear-gradient(180deg,#3a1304,#150600); border:2px solid #f3c969; box-shadow:0 0 34px #f3c96988; }
+  .al-lantern::before { content:'🏮'; display:block; font-size:44px; animation:swing 2.4s ease-in-out infinite; transform-origin:top center; }
+  @keyframes swing { 0%,100% { transform:rotate(-8deg); } 50% { transform:rotate(8deg); } }
+  .al-mosque { background:linear-gradient(180deg,#0a2540,#05121f); border:2px solid #f3c969; border-radius:60px 60px 18px 18px; box-shadow:0 0 30px #f3c96977; }
+  .al-mosque::before { content:'🕌'; display:block; font-size:40px; }
+  .al-lattice { background:#0b3b3a; background-image:radial-gradient(circle,#f3c96933 2px,transparent 3px),linear-gradient(45deg,#f3c96914 25%,transparent 25% 75%,#f3c96914 75%); background-size:22px 22px,22px 22px; border:3px double #f3c969; }
+  .al-tasbih { background:#1b1030; border:2px dashed #f3c969; border-radius:90px; box-shadow:0 0 28px #a78bfa66; }
+  .al-tasbih::before { content:'📿'; margin-inline-end:10px; }
+  .al-manuscript { background:#e9d8a6; color:#3b2408; border:6px double #8a5a14; border-radius:6px; box-shadow:0 6px 24px #0008; text-shadow:none; }
+  .al-stardust { background:radial-gradient(circle at 50% 0,#2a1d04,#0a0700); border:1px solid #f3c969; box-shadow:0 0 40px #f3c969aa; text-shadow:0 0 12px #f3c969; }
+  .al-stardust::after { content:'✨ ✦ ✨'; display:block; opacity:.8; letter-spacing:8px; animation:pulse 1.6s infinite; }
+  .dh { font:800 54px/1.4 'Cairo','Amiri',serif; text-align:center; color:#f3c969; text-shadow:0 0 18px #f3c96988; animation:dhin .9s; min-width:520px; padding:14px 30px; }
+  @keyframes dhin { from { opacity:0; transform:translateY(16px) scale(.96); } }
+  .dh.classic { border:3px double #f3c969; border-radius:60px; background:rgba(20,10,0,.78); }
+  .dh.book { background:linear-gradient(90deg,#efe0b0,#fff7dc 50%,#efe0b0); color:#4a2c08; text-shadow:none; border-radius:8px 8px 28px 28px; box-shadow:inset 0 0 30px #8a5a14aa,0 6px 24px #000a; }
+  .dh.brush { color:#fff; text-shadow:3px 3px 0 #b8860b,0 0 24px #000; transform:rotate(-2deg); }
+  .dh.cards { background:#0b3b3a; border:2px solid #f3c969; border-radius:18px; box-shadow:10px 10px 0 #f3c96955; }
+  .dh.water { -webkit-box-reflect:below -6px linear-gradient(transparent 55%,#fff5); }
+  .dh.d3 { color:#ffe08a; text-shadow:1px 1px 0 #b8860b,2px 2px 0 #9a6f08,3px 3px 0 #7a5606,4px 4px 0 #5a3f04,6px 10px 18px #000a; }
+  .dh.classic::before,.dh.bar::before { content:'☪ ✦'; position:absolute; top:-18px; left:50%; transform:translateX(-50%); font-size:26px; letter-spacing:8px; color:#f3c969; text-shadow:0 0 10px #f3c969; }
+  .dh.classic,.dh.bar { position:relative; }
+  .dh.bar { font-size:30px; min-width:760px; background:linear-gradient(90deg,transparent,rgba(10,30,50,.9) 15%,rgba(10,30,50,.9) 85%,transparent); border-block:2px solid #f3c969; }
+  .dh.medal { border-radius:50%; width:340px; height:340px; min-width:0; padding:30px; box-sizing:border-box; display:flex; align-items:center; justify-content:center; font-size:38px; line-height:1.5; border:4px double #f3c969; background:radial-gradient(circle,#1b3a5a,#06101c); }
+  .dh.light { color:#fff; text-shadow:0 0 10px #fff,0 0 30px #ffe08a,0 0 70px #f3c969; }
+  .dh.star { background:linear-gradient(100deg,transparent,#f3c96933,transparent); background-size:200% 100%; animation:dhin .9s,sweep 3s linear infinite; }
+  .dh.mosaic { background:conic-gradient(from 45deg,#0b3b3a,#1b3b6b,#0b3b3a,#7a5606,#0b3b3a); border:3px solid #f3c969; border-radius:14px; color:#fff7d0; }
+  .ls { display:flex; align-items:center; gap:14px; padding:12px 24px; border:2px solid var(--b); border-radius:16px; background:var(--bg); color:var(--tx); box-shadow:0 0 26px var(--g); min-width:360px; }
+  .ls small { display:block; font-size:14px; opacity:.75; letter-spacing:1px; }
+  .ls b { font-size:30px; font-weight:900; }
+  .gt { width:560px; padding:12px 20px; border-radius:18px; background:rgba(10,14,26,.82); border:1px solid color-mix(in srgb,var(--c1) 55%,transparent); box-shadow:0 0 24px color-mix(in srgb,var(--c1) 35%,transparent); }
+  .gt .gh { display:flex; justify-content:space-between; font-weight:800; font-size:20px; margin-bottom:8px; }
+  .gt .gb { position:relative; height:26px; border-radius:99px; background:rgba(255,255,255,.12); }
+  .gt .gb i { position:absolute; inset:0 auto 0 0; border-radius:99px; width:0; background:linear-gradient(90deg,var(--c1),var(--c2)); transition:width .7s; }
+  .gt .gb em { position:absolute; top:50%; font-style:normal; font-size:34px; transform:translate(-50%,-50%); transition:left .7s; filter:drop-shadow(0 2px 6px #000); }  .al-crescent { background:linear-gradient(135deg,#0d1b3a,#1b2d63); border:2px solid #f3c969; border-radius:30px; box-shadow:0 0 30px #f3c96977; font-family:'Cairo',serif; color:#fff3c9; }
+  .al-crescent::before { content:'🌙'; display:block; font-size:42px; filter:drop-shadow(0 0 12px #f3c969); }
+  .al-fanous { background:radial-gradient(circle at 50% 0,#ffb347 0,#7a2e00 55%,#1a0800); border:2px solid #ffd27a; border-radius:30px 30px 60px 60px; box-shadow:0 0 44px #ff9a2faa; color:#fff7e0; font-family:'Cairo',serif; animation:var(--in,drop .5s),flick 3s infinite; }
+  .al-arabesque { background:#12332b; background-image:radial-gradient(circle at 50% 50%,transparent 9px,#f3c96922 10px,transparent 12px); background-size:28px 28px; border:3px double #f3c969; border-radius:12px; color:#fff3c9; font-family:'Cairo',serif; }
+  .al-night { background:linear-gradient(180deg,#02030f,#0b1b45); border:1px solid #8fa8ff; border-radius:20px; box-shadow:0 0 34px #4f6bff77; color:#e8eeff; font-family:'Cairo',serif; }
+  .al-night::before { content:'✦ ✧ ✦'; display:block; letter-spacing:10px; color:#cfe0ff; animation:pulse 1.8s infinite; }
+  .al-emerald { background:linear-gradient(135deg,#052e22,#0e6b4b); border:2px solid #5eead4; border-radius:20px; box-shadow:0 0 30px #10b98177; color:#eafff7; font-family:'Cairo',serif; }
+  .al-eid { background:linear-gradient(135deg,#7c2d12,#f59e0b 55%,#7c2d12); border:3px solid #fff0b8; border-radius:40px; box-shadow:0 0 40px #fbbf2499; color:#fff; text-shadow:0 2px 8px #000a; }
+  .al-eid::before { content:'🎉 🌙 🎉'; display:block; letter-spacing:6px; }
+  .dh.neon { color:#7dfcff; text-shadow:0 0 8px #00f0ff,0 0 26px #00f0ff,0 0 60px #0090ff; border:2px solid #00f0ff; border-radius:16px; box-shadow:0 0 24px #00f0ff88,inset 0 0 24px #00f0ff44; background:rgba(0,10,20,.7); }
+  .dh.fire { color:#ffe9a8; text-shadow:0 -4px 14px #ff6a00,0 -10px 30px #ff3d00,0 0 4px #fff; }
+  .dh.glass { background:rgba(255,255,255,.12); backdrop-filter:blur(14px); border:1px solid rgba(255,255,255,.4); border-radius:30px; color:#fff; text-shadow:0 2px 10px #0008; }
+  .dh.scroll { background:linear-gradient(90deg,#c9a45c,#f1dfae 10%,#f1dfae 90%,#c9a45c); color:#4a2c08; text-shadow:none; border-radius:10px; box-shadow:0 6px 20px #000a; }
+  .dh.emerald { background:linear-gradient(135deg,#052e22,#0e6b4b); color:#eafff7; border:3px solid #f3c969; border-radius:18px; text-shadow:0 0 12px #5eead4; }
+  .dh.sunrise { background:linear-gradient(180deg,#1e1b4b,#be185d 55%,#f59e0b); color:#fff; border-radius:22px; text-shadow:0 2px 10px #0009; }
+  .rs { position:absolute; top:0; pointer-events:none; animation:rsfall linear infinite; }
+  @keyframes rsfall { from { transform:translateY(-60px) rotate(0); opacity:0; } 10% { opacity:1; } to { transform:translateY(105vh) rotate(40deg); opacity:0; } }
+  @keyframes rsup { from { transform:translateY(105vh) rotate(-6deg); opacity:0; } 15% { opacity:1; } to { transform:translateY(-80px) rotate(6deg); opacity:0; } }
+  .alc.big { position:relative; font-size:34px; padding:24px 38px; animation:var(--in,drop .5s), pulse 1s .5s 3; }
+  /* leaderboard */
+  .toprow { display:flex; align-items:center; gap:10px; padding:7px 12px; border-radius:99px; }
+  /* chat variants */
+  .chat div { padding:4px 0; animation:in .3s; } @keyframes in { from { opacity:0; transform:translateY(8px); } }
+  .chat b { color:#00F0FF; }
+  .chat.neon { border:2px solid #00F0FF; box-shadow:0 0 22px #00F0FF88; background:rgba(5,8,20,.85); } .chat.neon b { color:#ff007f; text-shadow:0 0 8px #ff007f; }
+  .chat.terminal { background:#000; border:1px solid #22c55e; border-radius:6px; font-family:Consolas,monospace; color:#4ade80; direction:ltr; text-align:left; } .chat.terminal b { color:#86efac; }
+  .bub { display:block; width:fit-content; max-width:100%; padding:8px 14px; margin:6px 0; border-radius:18px 18px 4px 18px; background:linear-gradient(135deg,#7c3aed,#ec4899); animation:in .3s; }
+  .bub.b2 { border-radius:18px 18px 18px 4px; background:linear-gradient(135deg,#0891b2,#2563eb); }
+  /* ticker variants */
+  #tk { position:absolute; left:0; right:0; bottom:0; overflow:hidden; white-space:nowrap; direction:ltr; background:linear-gradient(90deg,rgba(10,14,26,.92),rgba(40,16,70,.92)); border-top:2px solid #00F0FF; padding:12px 0; font-size:24px; font-weight:700; }
+  #tk.neon { background:rgba(4,6,16,.92); border-top:0; border-bottom:0; box-shadow:0 0 24px #00F0FF88; color:#00F0FF; text-shadow:0 0 10px #00F0FF; border-block:2px solid #00F0FF; }
+  #tk.glass { left:40px; right:40px; bottom:30px; border-radius:99px; background:rgba(255,255,255,.1); backdrop-filter:blur(12px); border:1px solid rgba(255,255,255,.3); }
+  /* segments / battery */
+  #sg { display:flex; gap:6px; } #sg i { flex:1; height:20px; border-radius:5px; background:rgba(255,255,255,.12); transition:.4s; }
+  /* unified chat: TikTok + Twitch in one list, each line tagged with its platform */
+  #uc { display:flex; flex-direction:column; justify-content:flex-end; gap:6px; width:520px; height:calc(100vh - 40px); overflow:hidden; }
+  body.demo #uc { height:100%; }
+  /* ===== gift jar (الحصالة): every gift drops into a glass jar and piles up ===== */
+  #jw { position:absolute; left:30px; bottom:12px; width:460px; height:800px; --jc:#bfe3ff; --jg:rgba(160,205,255,.45); }
+  #jw.gold { --jc:#fbbf24; --jg:rgba(251,191,36,.5); } #jw.neon { --jc:#00F0FF; --jg:rgba(0,240,255,.6); } #jw.rose { --jc:#f472b6; --jg:rgba(244,114,182,.5); }
+  #jw.emerald { --jc:#34d399; --jg:rgba(52,211,153,.5); } #jw.royal { --jc:#a78bfa; --jg:rgba(167,139,250,.55); }
+  #jw svg, #jw canvas { position:absolute; left:0; top:0; width:460px; height:700px; pointer-events:none; }
+  #jw .jglow { filter:drop-shadow(0 0 14px var(--jg)); }
+  .jsp { position:absolute; color:var(--jc); text-shadow:0 0 10px var(--jc); animation:jtw 2.8s ease-in-out infinite; pointer-events:none; }
+  @keyframes jtw { 0%,100% { opacity:.15; transform:scale(.6) rotate(0); } 50% { opacity:1; transform:scale(1.1) rotate(25deg); } }
+  .jb { position:absolute; left:-26px; top:330px; max-width:560px; display:flex; align-items:center; gap:10px; padding:10px 24px 10px 10px; border-radius:34px; background:linear-gradient(180deg,rgba(34,28,44,.94),rgba(18,14,26,.94)); border:1px solid rgba(255,255,255,.14); box-shadow:0 10px 34px rgba(0,0,0,.55),0 0 22px var(--jg); color:#fff; font:800 21px/1.25 'Cairo',system-ui,sans-serif; animation:jbin .55s cubic-bezier(.2,1.5,.4,1); direction:ltr; white-space:nowrap; }
+  .jb::after { content:''; position:absolute; right:26px; bottom:-14px; border:10px solid transparent; border-top-color:rgba(18,14,26,.94); border-bottom:0; border-right-width:4px; }
+  .jb.out { animation:jbout .45s forwards; }
+  @keyframes jbin { from { opacity:0; transform:translateX(-60px) scale(.8); } }
+  @keyframes jbout { to { opacity:0; transform:translateY(-14px) scale(.92); } }
+  .jb .av, .jp .av { flex:none; width:46px; height:46px; border-radius:50%; object-fit:cover; display:flex; align-items:center; justify-content:center; font-weight:900; color:#fff; border:2px solid var(--jc); box-shadow:0 0 12px var(--jg); }
+  .jb .co { color:#fcd34d; } .jb .gn { color:#f9a8d4; }
+  .jp { position:absolute; left:50%; transform:translateX(-50%); display:flex; align-items:center; gap:12px; padding:9px 12px 9px 10px; border-radius:99px; background:linear-gradient(180deg,rgba(40,34,52,.95),rgba(18,14,26,.95)); border:1px solid rgba(255,255,255,.14); box-shadow:0 8px 26px rgba(0,0,0,.5),0 0 18px var(--jg); color:#fff; font:700 20px/1 'Cairo',system-ui,sans-serif; white-space:nowrap; direction:ltr; }
+  .jp .medal { width:34px; height:34px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:19px; background:radial-gradient(circle at 30% 25%,#fff3b0,#f5b800 55%,#a86b00); box-shadow:0 0 12px #f5b80099; }
+  .jp .chip { display:flex; align-items:center; gap:7px; padding:6px 14px; border-radius:99px; background:rgba(255,255,255,.09); color:#fcd34d; font-weight:900; }
+  .jcoin { width:22px; height:22px; border-radius:50%; display:inline-block; background:radial-gradient(circle at 32% 28%,#fff6b8,#f5c400 55%,#b87800); box-shadow:inset 0 0 0 2px #fde68a99,0 0 8px #f5c40088; position:relative; }
+  .jcoin::after { content:'♪'; position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:12px; color:#7a4a00; font-weight:900; }
+  .jp.jtc { bottom:62px; } .jp.jtl { bottom:6px; padding:8px 20px 8px 12px; font-size:19px; color:#fcd34d; }
+  .jp.jpulse { animation:jpop .45s; } @keyframes jpop { 40% { transform:translateX(-50%) scale(1.08); } }
+  /* ===== FX layer: fireworks / confetti / emoji rain, fired by rules ===== */
+  #fxw { position:fixed; inset:0; pointer-events:none; overflow:hidden; }
+  #fxc { position:absolute; left:0; top:0; width:100%; height:100%; }
+  /* reactions: big comic emoji pop + welcome card */
+  .fxr { position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); text-align:center; pointer-events:none; animation:fxrin .55s cubic-bezier(.2,1.7,.4,1); }
+  .fxr.out { animation:fxrout .45s forwards; }
+  .fxr .rays { position:absolute; left:50%; top:46%; width:820px; height:820px; margin:-410px 0 0 -410px; border-radius:50%; background:repeating-conic-gradient(from 0deg,var(--fc) 0 9deg,transparent 9deg 18deg); opacity:.4; -webkit-mask-image:radial-gradient(circle,#000 18%,transparent 68%); mask-image:radial-gradient(circle,#000 18%,transparent 68%); animation:fxspin 9s linear infinite; }
+  .fxr .em { position:relative; font-size:250px; line-height:1.05; filter:drop-shadow(0 14px 26px rgba(0,0,0,.55)) drop-shadow(0 0 40px var(--fc)); animation:fxwig .6s ease-in-out .5s 3; }
+  .fxr .ph { position:relative; margin-top:6px; font:900 64px/1.2 'Cairo',system-ui,sans-serif; color:#fff; -webkit-text-stroke:7px #111; paint-order:stroke fill; text-shadow:0 7px 0 var(--fc),0 14px 30px rgba(0,0,0,.6); transform:rotate(-3deg); white-space:nowrap; }
+  @keyframes fxrin { from { opacity:0; transform:translate(-50%,-50%) scale(.2) rotate(-14deg); } }
+  @keyframes fxrout { to { opacity:0; transform:translate(-50%,-64%) scale(.7); } }
+  @keyframes fxspin { to { transform:rotate(360deg); } }
+  @keyframes fxwig { 0%,100% { transform:rotate(0) scale(1); } 25% { transform:rotate(-9deg) scale(1.1); } 75% { transform:rotate(9deg) scale(1.1); } }
+  .fxr.v-meme_shock .em { animation:fxshk .08s linear .5s 16; } @keyframes fxshk { 0% { transform:translate(-9px,3px); } 50% { transform:translate(9px,-3px); } 100% { transform:translate(-9px,3px); } }
+  .fxr.v-meme_cry .em { animation:fxsad 1.2s ease-in-out .5s 2; } @keyframes fxsad { 50% { transform:translateY(16px) scale(.94); } }
+  .fxr.v-meme_boom .em { animation:fxboom .45s ease-out .45s 2; } @keyframes fxboom { 50% { transform:scale(1.35); } }
+  .fxr.welcome { top:28%; }
+  .fxr.welcome .spot { position:absolute; left:50%; top:-340px; width:760px; height:980px; margin-left:-380px; background:linear-gradient(180deg,rgba(255,255,255,.42),transparent 82%); clip-path:polygon(38% 0,62% 0,100% 100%,0 100%); opacity:.6; filter:blur(7px); }
+  .fxr.welcome .wc { position:relative; display:inline-flex; align-items:center; gap:20px; padding:18px 52px 18px 40px; border-radius:99px; background:linear-gradient(180deg,rgba(44,32,72,.96),rgba(14,10,28,.96)); border:2px solid var(--fc); box-shadow:0 0 54px var(--fc),0 20px 50px rgba(0,0,0,.6); font:900 58px/1.2 'Cairo',system-ui,sans-serif; color:#fff; text-shadow:0 0 18px var(--fc); white-space:nowrap; }
+  .fxr.welcome .wc i { font-style:normal; font-size:84px; display:inline-block; animation:fxwave .7s ease-in-out .4s 4; transform-origin:70% 80%; } @keyframes fxwave { 0%,100% { transform:rotate(0); } 50% { transform:rotate(22deg); } }
+  .fxb { position:absolute; left:50%; top:46px; transform:translateX(-50%); padding:12px 30px; border-radius:99px; background:linear-gradient(180deg,rgba(40,30,60,.92),rgba(14,10,24,.92)); border:1px solid rgba(255,255,255,.22); box-shadow:0 10px 36px rgba(0,0,0,.55),0 0 30px var(--fc,#00F0FF); color:#fff; font:900 30px/1.3 'Cairo',system-ui,sans-serif; white-space:nowrap; animation:fxbin .5s cubic-bezier(.2,1.4,.4,1); text-shadow:0 0 14px var(--fc,#00F0FF); }
+  .fxb.out { animation:fxbout .5s forwards; }
+  @keyframes fxbin { from { opacity:0; transform:translateX(-50%) translateY(-30px) scale(.8); } }
+  @keyframes fxbout { to { opacity:0; transform:translateX(-50%) translateY(-18px) scale(.94); } }
+  .fade-out { animation:fadeout .6s forwards !important; } @keyframes fadeout { to { opacity:0; transform:translateY(-8px) scale(.97); } }
+  .ucl { animation:slide .3s; font-size:var(--ucfs,22px); line-height:1.35; word-break:break-word; display:flex; gap:8px; align-items:baseline; }
+  .ucl .pb { flex:none; font-size:.62em; font-weight:900; padding:1px 7px; border-radius:6px; letter-spacing:.5px; line-height:1.5; align-self:center; }
+  .ucl .pb.tiktok { background:#000; color:#fff; box-shadow:-2px 0 0 #25f4ee, 2px 0 0 #fe2c55; } .ucl .pb.twitch { background:#9146ff; color:#fff; } .ucl .pb.kick { background:#53fc18; color:#06210a; }
+  .ucl .pb.ic { background:none; box-shadow:none; font-size:.8em; padding:0; }
+  .ucl .un { font-weight:800; flex:none; } .ucl .un.tiktok { color:#25f4ee; } .ucl .un.twitch { color:#c9a5ff; } .ucl .un.kick { color:#9dff73; } .ucl .un.bot { color:#fbbf24; } .ucl .st { color:#fbbf24; font-size:.8em; }
+  .ucl.card { background:rgba(10,14,26,var(--bgA,.82)); border:1px solid rgba(255,255,255,.12); border-radius:12px; padding:7px 12px; }
+  .ucl.card.tiktok { border-inline-start:4px solid #25f4ee; } .ucl.card.twitch { border-inline-start:4px solid #9146ff; } .ucl.card.kick { border-inline-start:4px solid #53fc18; }
+  .ucl.clean { text-shadow:0 2px 6px #000, 0 0 12px #000; }
+  .ucl.pill { background:linear-gradient(90deg,rgba(254,44,85,.55),rgba(10,14,26,.85)); border-radius:99px; padding:6px 16px; } .ucl.pill.twitch { background:linear-gradient(90deg,rgba(145,70,255,.65),rgba(10,14,26,.85)); } .ucl.pill.kick { background:linear-gradient(90deg,rgba(83,252,24,.5),rgba(10,14,26,.85)); }
+  /* demo (gallery previews): center everything inside a small canvas */
+  body.demo #root { display:flex; align-items:center; justify-content:center; padding:10px; }
+  body.demo #root > *:not(#fx):not(#rsx):not(#jw):not(#fxw) { margin:0 !important; position:relative !important; left:auto !important; right:auto !important; top:auto !important; bottom:auto !important; transform:none !important; }
+  body.demo #tk { width:92%; } body.demo #tk.glass { left:auto !important; right:auto !important; }
+  body.demo .pop { opacity:0; } body.demo .pop.on { opacity:1; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script src="shared.js"></script>
+<script>
+const q = new URLSearchParams(location.search);
+let CFG = { ...DEFAULT_CFG, ...store.get('lsx-cfg', {}) };
+const SLOT = q.get('slot');
+const pickTpl = () => SLOT
+  ? (TEMPLATES.find(x => x.id === (CFG.slots || {})[SLOT]) || TEMPLATES.find(x => slotKey(x) === SLOT) || { view: SLOT })
+  : (TEMPLATES.find(x => x.id === q.get('t')) || { view: q.get('t') || 'gift-rocket' });
+const TPL = pickTpl();
+const T = TPL.view, VAR = TPL.v || '', ONLY = TPL.only || '';
+const DEMO = q.has('demo');
+if (DEMO) document.body.classList.add('demo');
+const goalTarget = +q.get('goal') || 10;
+const root = document.getElementById('root');
+const $i = (id) => document.getElementById(id);
+const esc = (s) => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const fmt = (s) => [Math.floor(s/3600), Math.floor(s/60)%60, s%60].map(n => String(n).padStart(2,'0')).join(':');
+const pct = (a, b) => Math.min(100, a / (+b || 1) * 100);
+
+const S = DEMO
+  ? { gifts: 6, follows: 42, likes: 3420, secs: 754, vsA: 62, vsB: 38, board: { 'سارة': 120, 'Ahmed': 85, 'Lina': 60, 'خالد': 41, 'Noor': 22 }, lboard: { 'Noor': 900, 'سارة': 640, 'Lina': 410, 'Ahmed': 300, 'خالد': 120 }, recent: ['🎁 سارة ×3', '➕ Ahmed', '⭐ Lina', '🎁 Noor ×1', '➕ خالد'] }
+  : store.get('lsx-state', { gifts: 0, follows: 0, likes: 0, board: {}, secs: 900 });
+S.lboard = S.lboard || {}; S.recent = S.recent || [];
+const save = () => { if (!DEMO) store.set('lsx-state', S); };
+
+// ---- per-template look chosen in the dashboard's "customise" drawer ----
+const OPT = { rows: 5, bg: 82, glow: '', scale: 100, anim: 'slide', custom: false };
+function readOpts() {
+  const o = (CFG.tplOpts || {})[TPL.id];
+  Object.assign(OPT, { rows: 5, bg: 82, glow: '', scale: 100, anim: 'slide', custom: !!o }, o || {});
+}
+function applyOpts() {
+  document.documentElement.style.setProperty('--bgA', OPT.bg / 100);
+  root.style.zoom = OPT.scale / 100;
+  root.style.filter = OPT.glow ? `drop-shadow(0 0 14px ${OPT.glow}) drop-shadow(0 0 30px ${OPT.glow}88)` : '';
+}
+readOpts(); applyOpts();
+// cloud TTS: OBS fetches MP3 from /tts/<token>; the dashboard preview uses the logged-in /api/tts route (see speakAuto in shared.js)
+window.SG_TTS_BASE = q.get('k') ? '/tts/' + encodeURIComponent(q.get('k')) : '/api/tts';
+Object.defineProperty(window, 'SG_TTS_OPTS', { get: () => CFG.tts });
+// requestAnimationFrame is paused in hidden tabs; this falls back to a timer so counters and the wheel still finish
+const raf = (fn) => { let done = false; const go = (t) => { if (done) return; done = true; fn(t || performance.now()); }; setTimeout(go, 90); requestAnimationFrame(go); };
+let SIM = false; // true while the dashboard drives this frame with simulated events
+
+// visual for a (simulated) gift: the emoji floats up with the sender's name
+const GIFT_EMOJI = { bits: '💎', 'gift sub': '🎁', rose: '🌹', lion: '🦁', heart: '💖', 'tiktok universe': '🌌', galaxy: '🌌', default: '🎁' };
+function giftFx(ev) {
+  let box = document.getElementById('gfx');
+  if (!box) { box = document.createElement('div'); box.id = 'gfx'; box.style.cssText = 'position:fixed;inset:0;z-index:50;pointer-events:none;overflow:hidden'; document.body.appendChild(box); }
+  const e = document.createElement('div'), em = GIFT_EMOJI[String(ev.gift || '').toLowerCase()] || GIFT_EMOJI.default;
+  e.style.cssText = `position:absolute;left:${15 + Math.random() * 65}%;bottom:-6%;text-align:center;animation:giftRise 2.4s ease-out forwards`;
+  e.innerHTML = `<div style="font-size:${46 + Math.min(40, (ev.count || 1) * 4)}px;filter:drop-shadow(0 0 12px #ff2d8a)">${em}</div><div style="font:800 14px Cairo,sans-serif;background:rgba(10,14,26,.88);padding:2px 10px;border-radius:99px;border:1px solid #ff2d8a;white-space:nowrap">${esc(ev.user || '')} ×${ev.count || 1}</div>`;
+  box.appendChild(e);
+  for (let i = 0; i < 6; i++) { const s = document.createElement('span'); s.textContent = ['✨', '💖', '⭐'][i % 3]; s.style.cssText = `position:absolute;left:${10 + Math.random() * 80}%;bottom:${Math.random() * 30}%;font-size:${14 + Math.random() * 14}px;animation:rise ${1.2 + Math.random()}s ease-out forwards`; box.appendChild(s); setTimeout(() => s.remove(), 2400); }
+  setTimeout(() => e.remove(), 2600);
+}
+// the dashboard (same origin) can drive a preview frame: simulated events and live option changes
+addEventListener('message', (m) => {
+  if (m.origin !== location.origin || !m.data || !m.data.sg) return;
+  if (m.data.sg === 'event') { SIM = true; handle({ ...m.data.ev, ts: Date.now() + Math.random() }); }
+  if (m.data.sg === 'opts') { Object.assign(OPT, m.data.opts || {}, { custom: true }); applyOpts(); V.draw(); }
+});
+
+let popTimer;
+function pop(html) {
+  let p = document.querySelector('.pop');
+  if (!p) { p = document.createElement('div'); p.className = 'pop card'; root.appendChild(p); }
+  p.innerHTML = html; p.classList.add('on');
+  clearTimeout(popTimer); popTimer = setTimeout(() => p.classList.remove('on'), 3500);
+}
+
+// ---- leaderboard theme rows ----
+const ROW_H = 54;
+let topRowsMap = new Map(), topFirst = true;
+function tweenNum(el, from, to) { // smooth count-up of a score
+  const t0 = performance.now(), d = 600;
+  const step = (t) => { const k = Math.min(1, (t - t0) / d), v = Math.round(from + (to - from) * (1 - Math.pow(1 - k, 3))); el.textContent = v; if (k < 1) raf(step); };
+  raf(step);
+}
+// leaderboard with smooth re-ordering: rows are keyed by viewer name and slide to their new place
+function renderTop() {
+  const mode = TPL.mode || 'gifts', th = VAR || 'rose';
+  const [, ic, c1, c2] = TOP_THEMES[th] || TOP_THEMES.rose;
+  const box = $i('tl'); if (!box) return;
+  const data = Object.entries(mode === 'likes' ? S.lboard : S.board).sort((a, b) => b[1] - a[1]).slice(0, OPT.rows);
+  box.style.height = Math.max(1, data.length) * ROW_H + 'px';
+  const keep = new Set(data.map(d => d[0]));
+  for (const [name, el] of [...topRowsMap]) if (!keep.has(name)) { el.style.opacity = 0; setTimeout(() => el.remove(), 450); topRowsMap.delete(name); }
+  if (!data.length && !topRowsMap.has('\u0000empty')) { const e = document.createElement('div'); e.className = 'toprow'; e.style.cssText = `background:rgba(10,14,26,var(--bgA,.88));border:1px solid ${c1}66;top:0;opacity:.7`; e.innerHTML = '<span style="flex:1;text-align:center">بانتظار الهدايا…</span>'; box.appendChild(e); topRowsMap.set('\u0000empty', e); }
+  if (data.length && topRowsMap.has('\u0000empty')) { topRowsMap.get('\u0000empty').remove(); topRowsMap.delete('\u0000empty'); }
+  data.forEach(([name, score], i) => {
+    let el = topRowsMap.get(name);
+    if (!el) {
+      el = document.createElement('div'); el.className = 'toprow' + (topFirst ? '' : ' ent-' + OPT.anim);
+      el.style.cssText = `background:linear-gradient(90deg,${c1}33,rgba(10,14,26,var(--bgA,.88)));border:1px solid ${c1}99;top:${i * ROW_H}px`;
+      el.innerHTML = `<span class="ic">${ic}</span><span style="width:30px;height:30px;border-radius:50%;background:${c2};color:#111;display:grid;place-items:center;font-weight:900;flex:none">${esc(name).slice(0, 1)}</span><span style="flex:1;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(name)}</span><span style="background:${c1}44;border-radius:99px;padding:2px 10px;font-weight:800;flex:none">${mode === 'likes' ? '❤️' : '🎁'} <span class="sc" dir="ltr">${score}</span></span>`;
+      el._score = score; box.appendChild(el); topRowsMap.set(name, el);
+    } else if (el._score !== score) {
+      const sc = el.querySelector('.sc'); tweenNum(sc, el._score, score); el._score = score;
+      sc.classList.remove('bump'); void sc.offsetWidth; sc.classList.add('bump');
+    }
+    el.style.top = i * ROW_H + 'px';
+    el.style.boxShadow = `0 0 ${i ? 8 : 20}px ${c1}66`; el.style.transform = i === 0 ? 'scale(1.04)' : '';
+    el.querySelector('.ic').style.fontSize = (i ? 18 : 26) + 'px';
+  });
+  topFirst = false;
+}
+
+// ---- goal helpers ----
+const goalCur = () => DEMO ? 62 + (S.gifts - 6) : (+CFG.goal.cur || 0) + (CFG.goal.src === 'gifts' ? S.gifts : CFG.goal.src === 'follows' ? S.follows : 0);
+const goalTgt = () => DEMO ? 100 : (+CFG.goal.target || 1);
+
+// ---- tap ("تكبيس") goal counter: the running like total climbing toward 1000 → 5000 → 10000 ... ----
+const tapTargets = () => (CFG.taps.targets || []).map(Number).filter(n => n > 0).sort((a, b) => a - b);
+function tapTarget(cur) { // the next target above `cur`; after the list ends it keeps going in steps of the last gap
+  const ts = tapTargets(); if (!ts.length) return (Math.floor(cur / 1000) + 1) * 1000;
+  const nx = ts.find(t => t > cur); if (nx) return nx;
+  const last = ts[ts.length - 1], gap = ts.length > 1 ? last - ts[ts.length - 2] : last;
+  return last + (Math.floor((cur - last) / gap) + 1) * gap;
+}
+const tapHead = (g) => `<div style="font-weight:800;font-size:20px;margin-bottom:6px">❤️ ${esc(g.title)}</div>`;
+const tapNum = (size, color) => `<div dir="ltr" style="font-weight:900;line-height:1"><b id="tn" style="font-size:${size}px;color:${color};text-shadow:0 0 14px ${color}88;font-variant-numeric:tabular-nums">0</b><span style="opacity:.7;font-size:${Math.round(size * .5)}px"> / <span id="tt"></span></span></div>`;
+const barRow = (c1, c2, h = 20) => `<div class="bar" style="height:${h}px"><i id="tf" style="background:linear-gradient(90deg,${c1},${c2})"></i></div>`;
+const setW = (p) => { $i('tf').style.width = p + '%'; };
+const HEART = 'M50 85 C-10 40 10 5 35 8 C45 9 50 18 50 22 C50 18 55 9 65 8 C90 5 110 40 50 85Z';
+const TAPUI = {
+  neon: { html: (g) => `<div class="card" style="width:580px;border-color:${g.c1}88;box-shadow:0 0 26px ${g.c1}55">${tapHead(g)}${tapNum(34, g.c1)}<div style="height:8px"></div>${barRow(g.c1, g.c2)}</div>`, fill: setW },
+  heart: { html: (g) => `<div style="display:flex;align-items:center;gap:20px" dir="ltr"><svg width="190" height="170" viewBox="0 0 100 90"><defs><clipPath id="hc"><rect id="hf" x="0" y="90" width="100" height="90"/></clipPath><linearGradient id="hg" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="${g.c1}"/><stop offset="1" stop-color="${g.c2}"/></linearGradient></defs><path d="${HEART}" fill="rgba(255,255,255,.1)" stroke="${g.c1}" stroke-width="2.5"/><path d="${HEART}" fill="url(#hg)" clip-path="url(#hc)"/></svg><div>${tapHead(g)}${tapNum(46, g.c1)}</div></div>`, fill: (p) => { $i('hf').setAttribute('y', 90 - 90 * p / 100); } },
+  ring: { html: (g) => `<div class="card" style="display:flex;align-items:center;gap:18px" dir="ltr"><svg width="150" height="150" viewBox="0 0 120 120"><circle cx="60" cy="60" r="50" fill="none" stroke="rgba(255,255,255,.12)" stroke-width="12"/><circle id="rg" cx="60" cy="60" r="50" fill="none" stroke="${g.c1}" stroke-width="12" stroke-linecap="round" stroke-dasharray="314" stroke-dashoffset="314" transform="rotate(-90 60 60)" style="filter:drop-shadow(0 0 6px ${g.c1})"/><text x="60" y="68" text-anchor="middle" font-size="28">❤️</text></svg><div>${tapHead(g)}${tapNum(40, g.c1)}</div></div>`, fill: (p) => { $i('rg').style.strokeDashoffset = 314 * (1 - p / 100); } },
+  rocket: { html: (g) => `<div style="width:620px" dir="ltr">${tapHead(g)}<div style="position:relative;height:84px"><div class="bar" style="position:absolute;top:44px;left:0;right:0;height:18px"><i id="tf" style="background:linear-gradient(90deg,${g.c1},${g.c2})"></i></div><div id="rk" style="position:absolute;top:0;font-size:46px;transition:left .6s;transform:rotate(45deg)">🚀</div></div>${tapNum(34, g.c1)}</div>`, fill: (p) => { setW(p); $i('rk').style.left = `calc(${p}% - 26px)`; } },
+  battery: { html: (g) => `<div style="display:flex;align-items:center;gap:6px;width:560px" dir="ltr"><div style="flex:1;height:78px;border:4px solid ${g.c1};border-radius:16px;padding:6px;box-shadow:0 0 18px ${g.c1}88;position:relative"><div id="tf" style="height:100%;width:0;border-radius:9px;background:linear-gradient(90deg,${g.c1},${g.c2});transition:width .6s"></div><div style="position:absolute;inset:0;display:grid;place-items:center">${tapNum(32, '#fff')}</div></div><div style="width:14px;height:30px;background:${g.c1};border-radius:0 7px 7px 0"></div></div>`, fill: setW },
+  thermo: { html: (g) => `<div style="display:flex;align-items:flex-end;gap:16px" dir="ltr"><div style="width:54px;height:300px;border:3px solid ${g.c1};border-radius:30px;position:relative;overflow:hidden;background:rgba(255,255,255,.08);box-shadow:0 0 18px ${g.c1}66"><div id="tf" style="position:absolute;bottom:0;left:0;right:0;height:0;background:linear-gradient(0deg,${g.c1},${g.c2});transition:height .6s"></div></div><div>${tapHead(g)}${tapNum(44, g.c1)}</div></div>`, fill: (p) => { $i('tf').style.height = p + '%'; } },
+  flame: { html: (g) => `<div style="width:600px" dir="ltr">${tapHead(g)}<div style="position:relative">${barRow('#ffb703', '#ff3d00', 26)}<div id="fl" style="position:absolute;top:-16px;font-size:44px;transition:left .6s">🔥</div></div><div style="height:6px"></div>${tapNum(36, '#ff7a18')}</div>`, fill: (p) => { setW(p); $i('fl').style.left = `calc(${p}% - 24px)`; } },
+  pill: { html: (g) => `<div style="width:600px;height:64px;border-radius:99px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.3);backdrop-filter:blur(8px);position:relative;overflow:hidden" dir="ltr"><div id="tf" style="position:absolute;inset:0 auto 0 0;width:0;background:linear-gradient(90deg,${g.c1},${g.c2});transition:width .6s"></div><div style="position:absolute;inset:0;display:flex;justify-content:space-between;align-items:center;padding:0 26px;text-shadow:0 1px 6px #000"><span style="font-weight:800;font-size:20px">❤️ ${esc(g.title)}</span>${tapNum(30, '#fff')}</div></div>`, fill: setW },
+  gauge: { html: (g) => `<div style="text-align:center" dir="ltr"><svg width="340" height="190" viewBox="0 0 200 110"><defs><linearGradient id="gg2" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="${g.c1}"/><stop offset="1" stop-color="${g.c2}"/></linearGradient></defs><path d="M20 100 A80 80 0 0 1 180 100" fill="none" stroke="rgba(255,255,255,.12)" stroke-width="14" stroke-linecap="round"/><path id="gg" d="M20 100 A80 80 0 0 1 180 100" fill="none" stroke="url(#gg2)" stroke-width="14" stroke-linecap="round" stroke-dasharray="251.3" stroke-dashoffset="251.3" style="filter:drop-shadow(0 0 5px ${g.c1})"/></svg><div style="margin-top:-62px">${tapNum(44, '#fff')}<div style="font-weight:800;margin-top:4px">${esc(g.title)}</div></div></div>`, fill: (p) => { $i('gg').style.strokeDashoffset = 251.3 * (1 - p / 100); } },
+  cyber: { html: (g) => `<div style="width:600px;padding:14px 20px;background:#070b16;border-inline:5px solid ${g.c1};clip-path:polygon(16px 0,100% 0,100% calc(100% - 16px),calc(100% - 16px) 100%,0 100%,0 16px)" dir="ltr"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><span style="font-weight:800;letter-spacing:2px;color:${g.c1}">// ${esc(g.title).toUpperCase()}</span>${tapNum(28, g.c1)}</div><div id="sg" style="display:flex;gap:4px">${'<i></i>'.repeat(24)}</div></div>`, fill: (p) => { const on = Math.round(p / 100 * 24), g = CFG.taps; [...$i('sg').children].forEach((el, i) => { el.style.cssText = `flex:1;height:18px;transition:.3s;background:${i < on ? g.c1 : 'rgba(255,255,255,.1)'};box-shadow:${i < on ? '0 0 8px ' + g.c1 : 'none'}`; }); } },
+  crown: { html: (g) => `<div style="width:580px;padding:22px 24px 16px;border-radius:16px;background:linear-gradient(135deg,#2a1d04,#120d02);border:2px solid #fbbf24;box-shadow:0 0 26px rgba(251,191,36,.5);position:relative;margin-top:22px" dir="ltr"><div style="position:absolute;top:-26px;left:24px;font-size:40px">👑</div><div style="color:#fde68a">${tapHead(g)}${tapNum(36, '#fbbf24')}</div><div style="height:8px"></div>${barRow('#fbbf24', '#f59e0b', 18)}</div>`, fill: setW },
+  minimal: { html: (g) => `<div style="width:520px;text-shadow:0 2px 14px #000" dir="ltr"><div style="font-size:16px;font-weight:700;letter-spacing:3px;opacity:.85">❤️ ${esc(g.title).toUpperCase()}</div>${tapNum(74, '#fff')}<div style="height:4px;background:rgba(255,255,255,.2);margin-top:8px"><i id="tf" style="display:block;height:100%;width:0;background:${g.c1};transition:width .6s"></i></div></div>`, fill: setW },
+  vertical: { html: (g) => `<div style="display:flex;align-items:flex-end;gap:16px" dir="ltr"><div style="width:80px;height:320px;border-radius:14px;border:2px solid ${g.c1};background:rgba(255,255,255,.06);position:relative;overflow:hidden;box-shadow:0 0 24px ${g.c1}66"><div id="tf" style="position:absolute;bottom:0;left:0;right:0;height:0;background:linear-gradient(0deg,${g.c1},${g.c2});transition:height .6s;box-shadow:0 0 20px ${g.c1}"></div></div><div>${tapHead(g)}${tapNum(48, g.c1)}</div></div>`, fill: (p) => { $i('tf').style.height = p + '%'; } },
+  galaxy: { html: (g) => `<div style="width:580px;padding:18px 22px;border-radius:20px;background:radial-gradient(circle at 20% 20%,#3b1d7a,#0a0620 70%);border:1px solid #7c3aed;box-shadow:0 0 30px #7c3aed88;position:relative;overflow:hidden" dir="ltr"><div style="position:absolute;inset:0;background-image:radial-gradient(2px 2px at 20px 30px,#fff,transparent),radial-gradient(2px 2px at 140px 70px,#c4b5fd,transparent),radial-gradient(1.5px 1.5px at 300px 20px,#fff,transparent),radial-gradient(2px 2px at 460px 60px,#c4b5fd,transparent);opacity:.8"></div><div style="position:relative">${tapHead(g)}${tapNum(36, '#e9d5ff')}<div style="height:8px"></div>${barRow('#a78bfa', '#ec4899', 18)}</div></div>`, fill: setW },
+};
+let shownTaps = 0, tapGen = 0;
+function tapFrame(gen, last) {
+  if (gen !== tapGen) return; // a newer animation loop took over
+  const now = performance.now(), dt = Math.min(0.3, (now - (last || now - 16)) / 1000);
+  const ui = TAPUI[VAR] || TAPUI.neon, tg = tapTarget(S.likes);
+  shownTaps += (S.likes - shownTaps) * (1 - Math.exp(-dt * 8)); if (Math.abs(S.likes - shownTaps) < 0.5) shownTaps = S.likes;
+  if ($i('tn')) $i('tn').textContent = Math.round(shownTaps).toLocaleString('en-US');
+  if ($i('tt')) $i('tt').textContent = tg.toLocaleString('en-US');
+  const prev = [0, ...tapTargets()].filter(t => t < tg).pop() || 0; // progress inside the current stage keeps the bar moving after each goal
+  ui.fill(Math.max(0, Math.min(100, (shownTaps - prev) / (tg - prev) * 100)));
+  if (shownTaps !== S.likes) raf(() => tapFrame(gen, now));
+}
+function tapBurst(n) { // little hearts per tap
+  for (let i = 0; i < Math.min(n, 6); i++) setTimeout(() => {
+    const h = document.createElement('div'); h.textContent = ['❤️', '💖', '💗', '💜'][Math.random() * 4 | 0];
+    h.style.cssText = `position:absolute;left:${30 + Math.random() * 40}%;bottom:12%;font-size:${22 + Math.random() * 20}px;pointer-events:none;animation:rise ${1.8 + Math.random()}s ease-out forwards`;
+    ($i('fx') || root).appendChild(h); setTimeout(() => h.remove(), 3200);
+  }, i * 90);
+}
+function tapCelebrate(prevLikes) { // a target was crossed: banner + confetti + sound
+  let t = tapTarget(prevLikes), nx = tapTarget(t); if (S.likes < t) return;
+  while (nx <= S.likes) { t = nx; nx = tapTarget(t); }
+  const g = CFG.taps; if (!g.on) return;
+  const text = String(g.text || '🎉 وصلنا {target}!').replace(/\{target\}/g, t.toLocaleString('en-US'));
+  const box = document.createElement('div');
+  box.style.cssText = 'position:absolute;left:50%;top:38%;transform:translate(-50%,-50%);z-index:5;animation:drop .5s,pulse 1s .5s 4';
+  box.innerHTML = `<div class="card" style="font-size:40px;font-weight:900;text-align:center;border:3px solid ${esc(g.c1)};box-shadow:0 0 50px ${esc(g.c1)};padding:22px 40px;white-space:nowrap">${esc(text)}</div>`;
+  ($i('fx') || root).appendChild(box);
+  for (let i = 0; i < 24; i++) { const s = document.createElement('span'); s.textContent = ['🎉', '✨', '💖', '⭐', '🔥'][i % 5]; s.style.cssText = `position:absolute;left:${Math.random() * 100}%;top:70%;font-size:${22 + Math.random() * 24}px;animation:rise ${1.6 + Math.random() * 1.6}s ease-out forwards;animation-delay:${Math.random() * .6}s`; box.appendChild(s); }
+  setTimeout(() => box.remove(), DEMO ? 3500 : 6500);
+  if (!DEMO) { playSound(g.sound, g.audio); if (g.tts) speak(text); }
+}
+
+// ---- lucky wheel: spins by itself when the chosen gift arrives ----
+let wheelAng = 0, wheelSpinning = false, wheelLast = 0;
+const WHEEL_STYLE = { neon: { rim: '#00F0FF', glow: true, text: '#fff', hub: '#0a0e1c' }, gold: { rim: '#fbbf24', glow: true, text: '#1a1405', hub: '#3a2a04' }, candy: { rim: '#ffffff', glow: false, text: '#fff', hub: '#ec4899' } };
+function drawWheel() {
+  const cv = $i('wc'); if (!cv) return;
+  const ctx = cv.getContext('2d'), W = cv.width, R = W / 2 - 14, c = W / 2, segs = CFG.wheel.segments, n = segs.length, sl = Math.PI * 2 / n, st = WHEEL_STYLE[VAR] || WHEEL_STYLE.neon;
+  ctx.clearRect(0, 0, W, W);
+  ctx.save(); ctx.translate(c, c); ctx.rotate(wheelAng);
+  segs.forEach((s, i) => {
+    ctx.beginPath(); ctx.moveTo(0, 0); ctx.arc(0, 0, R, i * sl, (i + 1) * sl); ctx.closePath();
+    ctx.fillStyle = s.c; ctx.fill(); ctx.strokeStyle = 'rgba(255,255,255,.35)'; ctx.lineWidth = 2; ctx.stroke();
+    ctx.save(); ctx.rotate(i * sl + sl / 2); ctx.textAlign = 'right'; ctx.fillStyle = st.text; ctx.font = `800 ${n > 10 ? 18 : 24}px Cairo, sans-serif`;
+    ctx.shadowColor = 'rgba(0,0,0,.6)'; ctx.shadowBlur = 4; ctx.fillText(s.t.length > 16 ? s.t.slice(0, 15) + '…' : s.t, R - 18, 8); ctx.restore();
+  });
+  ctx.restore();
+  ctx.beginPath(); ctx.arc(c, c, R + 7, 0, Math.PI * 2); ctx.lineWidth = 12; ctx.strokeStyle = st.rim; if (st.glow) { ctx.shadowColor = st.rim; ctx.shadowBlur = 22; } ctx.stroke(); ctx.shadowBlur = 0;
+  if (VAR === 'candy') for (let i = 0; i < 24; i++) { const a = i * Math.PI / 12; ctx.beginPath(); ctx.arc(c + Math.cos(a) * (R + 7), c + Math.sin(a) * (R + 7), 4, 0, 7); ctx.fillStyle = i % 2 ? '#fbbf24' : '#ff2d8a'; ctx.fill(); }
+  ctx.beginPath(); ctx.arc(c, c, 34, 0, Math.PI * 2); ctx.fillStyle = st.hub; ctx.fill(); ctx.lineWidth = 4; ctx.strokeStyle = st.rim; ctx.stroke();
+  ctx.fillStyle = '#fff'; ctx.font = '900 26px Cairo, sans-serif'; ctx.textAlign = 'center'; ctx.fillText('🎡', c, c + 9);
+}
+function tick() { try { _ac = _ac || new (window.AudioContext || window.webkitAudioContext)(); const o = _ac.createOscillator(), g = _ac.createGain(); o.frequency.value = 1300; g.gain.setValueAtTime(.12, _ac.currentTime); g.gain.exponentialRampToValueAtTime(.0001, _ac.currentTime + .04); o.connect(g); g.connect(_ac.destination); o.start(); o.stop(_ac.currentTime + .05); } catch {} }
+function spinWheel() {
+  if (wheelSpinning || !$i('wc')) return;
+  const w = CFG.wheel, n = w.segments.length, sl = Math.PI * 2 / n, idx = Math.floor(Math.random() * n);
+  const target = -Math.PI / 2 - (idx + .5 + (Math.random() - .5) * .7) * sl; // winning slice's centre ends under the pointer (top)
+  const start = wheelAng, delta = ((target - start) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2), total = delta + Math.PI * 2 * (5 + Math.floor(Math.random() * 3));
+  const dur = DEMO ? 3600 : 5400, t0 = performance.now(); wheelSpinning = true; wheelLast = Date.now(); $i('wr').textContent = '';
+  let lastSeg = -1;
+  const step = (t) => {
+    const k = Math.min(1, (t - t0) / dur), e = 1 - Math.pow(1 - k, 4);
+    wheelAng = start + total * e; drawWheel();
+    const seg = Math.floor((((-Math.PI / 2 - wheelAng) % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2) / sl);
+    if (seg !== lastSeg) { lastSeg = seg; if (!DEMO) tick(); }
+    if (k < 1) return raf(step);
+    wheelSpinning = false; wheelLast = Date.now();
+    const win = w.segments[idx], text = `🎉 ${win.t}`;
+    $i('wr').innerHTML = `<span style="color:${esc(win.c)};text-shadow:0 0 16px ${esc(win.c)}">${esc(text)}</span>`; $i('wr').style.animation = 'zoomIn .5s';
+    S.wheelLog = [win.t, ...(S.wheelLog || [])].slice(0, 20); save();
+    if (!DEMO) { playSound(w.sound); if (w.tts) speak('الفائز ' + win.t); }
+    setTimeout(() => { if ($i('wr') && !wheelSpinning) $i('wr').textContent = ''; }, DEMO ? 3000 : 9000);
+  };
+  raf(step);
+}
+// does this gift event start the wheel?
+function wheelTriggered(ev) {
+  const w = CFG.wheel; if (!w.auto || ev.type !== 'gift' || wheelSpinning) return false;
+  if (Date.now() - wheelLast < (+w.cooldown || 0) * 1000) return false;
+  if (w.gift && String(ev.gift || '').toLowerCase() !== w.gift.toLowerCase()) return false;
+  return (ev.diamonds || 0) >= (+w.min || 0);
+}
+
+// ---- TTS reader: reads chat aloud with the streamer's voice settings ----
+let ttsPending = 0;
+function ttsHandle(ev) {
+  const d = ttsDecision(ev, CFG.tts), st = $i('ts');
+  if (st) st.textContent = d.read ? `قرأ: ${ev.user}` : `تجاهل: ${d.why}`;
+  if (!d.read || ttsPending >= 5) return;
+  ttsPending++; if (!speakAuto(d.text, CFG.tts, () => { ttsPending = Math.max(0, ttsPending - 1); })) ttsPending = Math.max(0, ttsPending - 1);
+}
+
+// ---- all-in-one canvas: every enabled overlay as one layer, positioned from the dashboard ----
+const CANVAS_SLOT = { goal: 'goal-bar', taps: 'taps', top: 'top:gifts', alerts: 'alerts', social: 'social', ticker: 'ticker', chat: 'chat', recent: 'recent' };
+const CANVAS_ORIGIN = { alerts: '50% 20px', social: '50% 20px', ticker: '50% 100%' };
+function layoutCanvas() {
+  const C = CFG.canvas || DEFAULT_CFG.canvas, mode = q.get('m') || C.mode, L = C.layouts[mode] || DEFAULT_CFG.canvas.layouts[mode] || DEFAULT_CFG.canvas.layouts['16:9'];
+  const [W, H] = mode === '9:16' ? [1080, 1920] : [1920, 1080], cv = $i('cv'); if (!cv) return;
+  cv.style.width = W + 'px'; cv.style.height = H + 'px';
+  const k = q.get('k') ? '&k=' + encodeURIComponent(q.get('k')) : '';
+  L.order.forEach((key, z) => {
+    const l = L.layers[key], id = 'cl-' + key; let f = $i(id);
+    if (!l || !l.on) { if (f) f.remove(); return; }
+    if (!f) { f = document.createElement('iframe'); f.id = id; f.src = `overlay.html?slot=${encodeURIComponent(CANVAS_SLOT[key])}${k}`; f.allow = 'autoplay'; cv.appendChild(f); }
+    f.style.cssText = `position:absolute;left:0;top:0;width:${W}px;height:${H}px;border:0;background:transparent;transform-origin:${CANVAS_ORIGIN[key] || '20px 20px'};transform:translate(${+l.x || 0}px,${+l.y || 0}px) scale(${+l.s || 1});z-index:${z}`;
+  });
+}
+
+const COUNTERS = { gifts: ['🎁', 'الهدايا', () => S.gifts], followers: ['➕', 'المتابعون', () => S.follows], likes: ['❤️', 'الإعجابات', () => S.likes] };
+const VS = { neon: ['#00F0FF', '#ff007f'], fire: ['#ff7a18', '#38bdf8'], gold: ['#fbbf24', '#7c3aed'] };
+
+// ---- gift-jar vessels: each has its own glass/wood artwork + the wall profile the gifts collide with ----
+const JARS = (() => {
+  const CX = 230;
+  const smooth = (pts, noM) => { let d = noM ? '' : `M${pts[0][0].toFixed(1)} ${pts[0][1].toFixed(1)}`; for (let i = 0; i < pts.length - 1; i++) { const p0 = pts[i - 1] || pts[i], p1 = pts[i], p2 = pts[i + 1], p3 = pts[i + 2] || p2; d += ` C${(p1[0] + (p2[0] - p0[0]) / 6).toFixed(1)} ${(p1[1] + (p2[1] - p0[1]) / 6).toFixed(1)} ${(p2[0] - (p3[0] - p1[0]) / 6).toFixed(1)} ${(p2[1] - (p3[1] - p1[1]) / 6).toFixed(1)} ${p2[0].toFixed(1)} ${p2[1].toFixed(1)}`; } return d; };
+  const interp = (pts, y) => { if (y <= pts[0][0]) return pts[0][1]; for (let i = 1; i < pts.length; i++) if (y <= pts[i][0]) { const a = pts[i - 1], b = pts[i]; return a[1] + (b[1] - a[1]) * (y - a[0]) / ((b[0] - a[0]) || 1); } return pts[pts.length - 1][1]; };
+  const DEFS = '<defs><linearGradient id="jg1" x1="0" x2="1"><stop offset="0" stop-color="#fff" stop-opacity=".28"/><stop offset=".5" stop-color="#fff" stop-opacity=".05"/><stop offset="1" stop-color="#fff" stop-opacity=".2"/></linearGradient><radialGradient id="jfloor" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="var(--jc)" stop-opacity=".55"/><stop offset="1" stop-color="var(--jc)" stop-opacity="0"/></radialGradient><linearGradient id="jrim" x1="0" x2="1"><stop offset="0" stop-color="#8f9aa6"/><stop offset=".25" stop-color="#fff"/><stop offset=".6" stop-color="#b8c2cc"/><stop offset="1" stop-color="#7d8894"/></linearGradient><linearGradient id="jgold" x1="0" x2="1"><stop offset="0" stop-color="#a86b00"/><stop offset=".3" stop-color="#ffe27a"/><stop offset=".6" stop-color="#f5b800"/><stop offset="1" stop-color="#8a5400"/></linearGradient><linearGradient id="jwood" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#9a6632"/><stop offset="1" stop-color="#4a2a12"/></linearGradient></defs>';
+  const svg = (inner) => `<svg viewBox="0 0 460 700" class="jglow">${DEFS}${inner}</svg>`;
+  // generic glass vessel from a profile of [y, half-width] points (inside of the glass)
+  function glass(pts, o) {
+    const th = o.thick || 12, fl = o.floor, y0 = pts[0][0], h0 = pts[0][1], hmax = Math.max(...pts.map((p) => p[1]));
+    const L = (d) => pts.map(([y, h]) => [CX - h - d, y]), R = (d) => pts.map(([y, h]) => [CX + h + d, y]);
+    const closed = (d) => smooth(L(d)) + ` L${R(d)[pts.length - 1][0].toFixed(1)} ${pts[pts.length - 1][0]}` + smooth(R(d).reverse(), true) + ' Z';
+    const shiftIn = (arr, dx) => arr.map(([x, y]) => [x + dx, y]);
+    const a = Math.floor(pts.length * .22), b = Math.max(a + 2, Math.floor(pts.length * .78));
+    const back = svg(`<ellipse cx="230" cy="${fl + 26}" rx="${Math.min(215, hmax + 38)}" ry="16" fill="#000" opacity=".45"/><ellipse cx="230" cy="${fl + 12}" rx="${Math.min(200, hmax + 24)}" ry="24" fill="url(#jfloor)"/>${o.back || ''}<path d="${closed(0)}" fill="rgba(20,16,34,.26)"/><ellipse cx="230" cy="${y0}" rx="${h0}" ry="11" fill="rgba(0,0,0,.45)"/>`);
+    const front = svg(`${o.behind || ''}<path d="${closed(th)}" fill="url(#jg1)" stroke="var(--jc)" stroke-opacity=".7" stroke-width="3"/><path d="${smooth(L(0))}" fill="none" stroke="#fff" stroke-opacity=".22" stroke-width="2"/><path d="${smooth(R(0))}" fill="none" stroke="#fff" stroke-opacity=".22" stroke-width="2"/>`
+      + `<path d="${smooth(shiftIn(L(0).slice(a, b), 18))}" fill="none" stroke="#fff" stroke-opacity=".5" stroke-width="8" stroke-linecap="round"/><path d="${smooth(shiftIn(L(0).slice(a, b), 32))}" fill="none" stroke="#fff" stroke-opacity=".18" stroke-width="16" stroke-linecap="round"/><path d="${smooth(shiftIn(R(0).slice(a + 1, b), -14))}" fill="none" stroke="#fff" stroke-opacity=".16" stroke-width="7" stroke-linecap="round"/>`
+      + `${o.rim === false ? '' : `<ellipse cx="230" cy="${y0}" rx="${h0 + th + 4}" ry="14" fill="none" stroke="url(#jrim)" stroke-width="7"/><ellipse cx="230" cy="${y0 + 3}" rx="${h0 + th - 2}" ry="10" fill="none" stroke="var(--jc)" stroke-opacity=".5" stroke-width="2"/>`}${o.deco || ''}`);
+    return { back, front, floor: fl, spawnY: y0 + 24, rMax: Math.max(17, Math.min(31, Math.floor(h0 * .62))), cap: o.cap || 200, inner: (y) => { const h = interp(pts, y + 12); return [CX - h, CX + h]; } };
+  }
+  const sh = {};
+  // 1) the classic mason jar (hand-drawn)
+  sh.jar = { back: `<svg viewBox="0 0 460 700" class="jglow"><defs>
+        <linearGradient id="jg1" x1="0" x2="1"><stop offset="0" stop-color="#fff" stop-opacity=".28"/><stop offset=".5" stop-color="#fff" stop-opacity=".05"/><stop offset="1" stop-color="#fff" stop-opacity=".2"/></linearGradient>
+        <radialGradient id="jfloor" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="var(--jc)" stop-opacity=".55"/><stop offset="1" stop-color="var(--jc)" stop-opacity="0"/></radialGradient>
+        <linearGradient id="jrim" x1="0" x2="1"><stop offset="0" stop-color="#8f9aa6"/><stop offset=".25" stop-color="#fff"/><stop offset=".6" stop-color="#b8c2cc"/><stop offset="1" stop-color="#7d8894"/></linearGradient></defs>
+        <ellipse cx="230" cy="676" rx="205" ry="17" fill="#000" opacity=".45"/>
+        <ellipse cx="230" cy="662" rx="190" ry="26" fill="url(#jfloor)"/>
+        <path d="M112 124 C112 152 114 176 94 204 C66 238 48 252 48 292 L48 602 Q48 650 96 650 L364 650 Q412 650 412 602 L412 292 C412 252 394 238 366 204 C346 176 348 152 348 124 Z" fill="rgba(20,16,34,.26)"/>
+        <ellipse cx="230" cy="112" rx="124" ry="13" fill="rgba(0,0,0,.45)"/></svg>`, front: `<svg viewBox="0 0 460 700" class="jglow"><defs><clipPath id="jc"><path d="M98 124 C98 150 100 170 80 198 C52 232 34 246 34 290 L34 604 Q34 664 94 664 L366 664 Q426 664 426 604 L426 290 C426 246 408 232 380 198 C360 170 362 150 362 124 Z"/></clipPath></defs>
+        <path d="M98 124 C98 150 100 170 80 198 C52 232 34 246 34 290 L34 604 Q34 664 94 664 L366 664 Q426 664 426 604 L426 290 C426 246 408 232 380 198 C360 170 362 150 362 124 Z" fill="url(#jg1)" stroke="var(--jc)" stroke-opacity=".7" stroke-width="3"/>
+        <path d="M112 124 C112 152 114 176 94 204 C66 238 48 252 48 292 L48 602 Q48 650 96 650 L364 650 Q412 650 412 602 L412 292 C412 252 394 238 366 204 C346 176 348 152 348 124" fill="none" stroke="#fff" stroke-opacity=".22" stroke-width="2"/>
+        <g clip-path="url(#jc)"><rect x="52" y="250" width="22" height="380" rx="11" fill="#fff" opacity=".2"/><rect x="60" y="270" width="7" height="300" rx="4" fill="#fff" opacity=".5"/><rect x="392" y="270" width="9" height="330" rx="4" fill="#fff" opacity=".16"/><ellipse cx="86" cy="226" rx="30" ry="9" transform="rotate(-38 86 226)" fill="#fff" opacity=".32"/></g>
+        <path d="M96 118 Q230 156 364 118 L364 140 Q230 180 96 140 Z" fill="url(#jrim)" stroke="var(--jc)" stroke-opacity=".6"/>
+        <path d="M100 150 Q230 188 360 150" fill="none" stroke="#fff" stroke-opacity=".55" stroke-width="3"/><path d="M104 164 Q230 202 356 164" fill="none" stroke="var(--jc)" stroke-opacity=".7" stroke-width="3"/>
+        <ellipse cx="230" cy="118" rx="134" ry="15" fill="none" stroke="url(#jrim)" stroke-width="7"/></svg>`, floor: 648, spawnY: 140, rMax: 31, cap: 260,
+    inner: (y) => { let a, b; if (y <= 165) { a = 114; b = 346; } else if (y >= 255) { a = 50; b = 410; } else { const t = (y - 165) / 90, s = t * t * (3 - 2 * t); a = 114 + (50 - 114) * s; b = 346 + (410 - 346) * s; } if (y > 600) { const d = y - 600, ins = 48 - Math.sqrt(Math.max(0, 2304 - d * d)); a += ins; b -= ins; } return [a, b]; } };
+  // 2) beaker / neon tube with graduation marks
+  const ticks = []; for (let y = 170; y <= 600; y += 54) ticks.push(`<line x1="${CX + 112 - ((y / 54 | 0) % 2 ? 22 : 38)}" y1="${y}" x2="${CX + 108}" y2="${y}" stroke="#fff" stroke-opacity=".6" stroke-width="3" stroke-linecap="round"/>`);
+  sh.tube = glass([[84, 112], [590, 112], [618, 108], [638, 98], [650, 82], [656, 62], [658, 36]], { floor: 650, thick: 13, cap: 170, deco: ticks.join('') });
+  // 3) fish-bowl globe on a stand
+  const bowl = [[96, 46], [210, 46]]; for (let d = 14; d <= 170; d += 12) bowl.push([430 - 205 * Math.cos(d * Math.PI / 180), 205 * Math.sin(d * Math.PI / 180)]); bowl.push([634, 26]);
+  sh.bowl = glass(bowl, { floor: 628, thick: 11, cap: 190, back: '<ellipse cx="230" cy="662" rx="120" ry="15" fill="#171329" stroke="var(--jc)" stroke-opacity=".6" stroke-width="2"/>',
+    deco: '<rect x="170" y="86" width="120" height="26" rx="9" fill="url(#jrim)" stroke="var(--jc)" stroke-opacity=".6"/>' });
+  // 4) crystal vase with gold bands
+  sh.vase = glass([[96, 36], [170, 36], [205, 48], [250, 90], [310, 140], [380, 172], [440, 176], [510, 152], [570, 104], [610, 74], [640, 66]], { floor: 636, thick: 12, cap: 200,
+    deco: '<rect x="176" y="150" width="108" height="13" rx="6" fill="url(#jgold)"/><rect x="104" y="372" width="252" height="9" rx="4" fill="url(#jgold)" opacity=".85"/><rect x="170" y="636" width="120" height="16" rx="7" fill="url(#jgold)"/>' });
+  // 5) champion cup: glass bowl, gold handles / stem / base
+  sh.trophy = glass([[108, 172], [170, 168], [240, 148], [300, 114], [350, 78], [390, 48], [420, 30]], { floor: 420, thick: 12, cap: 62,
+    behind: '<path d="M70 150 C6 150 6 292 78 296" fill="none" stroke="url(#jgold)" stroke-width="13" stroke-linecap="round"/><path d="M390 150 C454 150 454 292 382 296" fill="none" stroke="url(#jgold)" stroke-width="13" stroke-linecap="round"/><rect x="214" y="440" width="32" height="150" fill="url(#jgold)"/><ellipse cx="230" cy="470" rx="38" ry="14" fill="url(#jgold)"/><path d="M150 650 L170 590 L290 590 L310 650 Z" fill="url(#jgold)" stroke="#6b4300" stroke-width="2"/><rect x="130" y="648" width="200" height="26" rx="10" fill="url(#jgold)" stroke="#6b4300" stroke-width="2"/>',
+    deco: '<rect x="56" y="100" width="348" height="16" rx="8" fill="url(#jgold)"/>' });
+  // 6) open treasure chest: the pile sits inside, a short front wall hides only the floor line
+  const wood = (x, w) => [1, 2, 3].map((i) => `<line x1="${x}" y1="${296 + i * 56}" x2="${x + w}" y2="${296 + i * 56}" stroke="#1a0d05" stroke-opacity=".55" stroke-width="3"/>`).join('');
+  sh.chest = { floor: 520, spawnY: 140, rMax: 31, cap: 120, inner: () => [58, 402],
+    back: svg('<ellipse cx="230" cy="672" rx="212" ry="17" fill="#000" opacity=".45"/><path d="M52 300 L68 108 Q230 82 392 108 L408 300 Z" fill="url(#jwood)" stroke="#2b1708" stroke-width="4"/><rect x="96" y="104" width="28" height="196" fill="url(#jgold)"/><rect x="336" y="104" width="28" height="196" fill="url(#jgold)"/><path d="M68 108 Q230 82 392 108" fill="none" stroke="url(#jgold)" stroke-width="9"/><rect x="56" y="296" width="348" height="226" fill="#241208"/><rect x="56" y="296" width="348" height="226" fill="url(#jfloor)" opacity=".35"/>' + wood(56, 348) + '<rect x="56" y="296" width="26" height="226" fill="#000" opacity=".4"/><rect x="378" y="296" width="26" height="226" fill="#000" opacity=".4"/>'),
+    front: svg('<rect x="32" y="296" width="20" height="236" rx="8" fill="url(#jgold)"/><rect x="408" y="296" width="20" height="236" rx="8" fill="url(#jgold)"/><rect x="34" y="520" width="392" height="136" rx="12" fill="url(#jwood)" stroke="#2b1708" stroke-width="4"/>' + wood(34, 392).replace(/y1="(\d+)"/g, (m, y) => `y1="${+y + 228 - 52}"`).replace(/y2="(\d+)"/g, (m, y) => `y2="${+y + 228 - 52}"`) + '<rect x="86" y="520" width="30" height="136" fill="url(#jgold)"/><rect x="344" y="520" width="30" height="136" fill="url(#jgold)"/><rect x="28" y="510" width="404" height="18" rx="9" fill="url(#jgold)"/><rect x="198" y="540" width="64" height="62" rx="11" fill="url(#jgold)" stroke="#6b4300" stroke-width="2"/><circle cx="230" cy="566" r="8" fill="#3a2300"/><rect x="226" y="566" width="8" height="24" rx="3" fill="#3a2300"/><circle cx="101" cy="545" r="4" fill="#6b4300"/><circle cx="359" cy="545" r="4" fill="#6b4300"/><circle cx="101" cy="630" r="4" fill="#6b4300"/><circle cx="359" cy="630" r="4" fill="#6b4300"/>') };
+  return sh;
+})();
+// ---- FX engine: canvas particles. Each effect pushes particles; one 60fps loop draws them with additive light ----
+const FXE = (() => {
+  let cv, ctx, W = 1920, H = 1080, P = [], flash = 0, flashCol = '#fff', bolts = [], rings = [], timers = [], last = 0;
+  const R = (a, b) => a + Math.random() * (b - a), PICK = (a) => a[Math.random() * a.length | 0];
+  const PAL = ['#ff3d6e', '#ffd23f', '#3dd6ff', '#7dff6b', '#c77dff', '#ff9f1c', '#ffffff', '#ff6bd6'];
+  const later = (fn, ms) => timers.push(setTimeout(fn, ms));
+  const glyphs = (s, d) => { const a = Array.from(String(s || '').replace(/\s+/g, '')); return a.length ? a : d; };
+  const sprites = {};
+  const sprite = (ch, size) => { const k = ch + '|' + size; if (sprites[k]) return sprites[k]; const c = document.createElement('canvas'); c.width = c.height = Math.ceil(size * 1.5); const x = c.getContext('2d'); x.font = `${size}px "Segoe UI Emoji","Apple Color Emoji","Noto Color Emoji",sans-serif`; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText(ch, c.width / 2, c.height / 2 + size * .06); return (sprites[k] = c); };
+  const push = (p) => { if (P.length < 2600) P.push(p); };
+  const dot = (x, y, vx, vy, col, life, o = {}) => push({ k: 'dot', x, y, px: x, py: y, vx, vy, col, life, max: life, size: o.size || R(1.6, 3.2), g: o.g == null ? 160 : o.g, drag: o.drag || .985, trail: o.trail !== false });
+  const colOf = (o) => o.color || PICK(PAL);
+  // ---- fireworks ----
+  function explode(x, y, col, type, k) {
+    push({ k: 'glow', x, y, col, life: .35, max: .35, size: 170 * k });
+    const n = Math.round((type === 'peony' ? 76 : type === 'ring' ? 56 : type === 'heart' ? 70 : type === 'star' ? 80 : type === 'willow' ? 60 : 90) * k);
+    for (let i = 0; i < n; i++) {
+      if (type === 'peony') { const a = Math.random() * 6.283, s = R(90, 330) * k; dot(x, y, Math.cos(a) * s, Math.sin(a) * s, i % 5 === 0 ? '#fff' : col, R(1, 1.7)); }
+      else if (type === 'ring') { const a = i / n * 6.283, s = 270 * k; dot(x, y, Math.cos(a) * s, Math.sin(a) * s, col, 1.35, { g: 60 }); }
+      else if (type === 'heart') { const t = i / n * 6.283, hx = 16 * Math.pow(Math.sin(t), 3), hy = -(13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t)); dot(x, y, hx * 13 * k, hy * 13 * k, col, 1.6, { g: 70, size: 2.6 }); }
+      else if (type === 'star') { const seg = Math.floor(i / n * 10), tt = (i / n * 10) % 1, a0 = seg * Math.PI / 5 - Math.PI / 2, a1 = (seg + 1) * Math.PI / 5 - Math.PI / 2, r0 = seg % 2 ? 90 : 230, r1 = seg % 2 ? 230 : 90, px = Math.cos(a0) * r0 * (1 - tt) + Math.cos(a1) * r1 * tt, py = Math.sin(a0) * r0 * (1 - tt) + Math.sin(a1) * r1 * tt; dot(x, y, px * 1.5 * k, py * 1.5 * k, col, 1.5, { g: 60, size: 2.6 }); }
+      else if (type === 'willow') { const a = Math.random() * 6.283, s = R(60, 210) * k; dot(x, y, Math.cos(a) * s, Math.sin(a) * s, '#ffd36b', R(2.2, 3.2), { g: 70, drag: .975 }); }
+      else { const a = Math.random() * 6.283, s = R(120, 380) * k; dot(x, y, Math.cos(a) * s, Math.sin(a) * s, PICK(PAL), R(.9, 1.6)); }
+    }
+  }
+  function rocket(o, type) {
+    const x = R(W * .12, W * .88), ty = R(H * .14, H * .46), g = 760;
+    push({ k: 'rocket', x, y: H + 10, px: x, py: H + 10, vx: R(-26, 26), vy: -Math.sqrt(2 * g * (H - ty)), g, ty, col: colOf(o), life: 5, max: 5, type, kk: o.big ? 1.55 : 1 });
+  }
+  function fireworks(o, mega, hearts) {
+    const n = (mega ? 8 : 3) + o.power * (mega ? 3 : 2);
+    for (let i = 0; i < n; i++) later(() => rocket({ ...o, big: mega }, hearts ? 'heart' : PICK(mega ? ['peony', 'ring', 'star', 'willow', 'double', 'heart'] : ['peony', 'ring', 'star', 'double', 'willow'])), i * (mega ? 210 : 330) + R(0, 140));
+  }
+  // ---- falling / rising emoji ----
+  function emoji(o, mode, def) {
+    const ch = glyphs(o.emoji, def), n = (mode === 'rain' ? 16 : mode === 'rise' ? 12 : 14) + o.power * (mode === 'burst' ? 10 : 12);
+    for (let i = 0; i < n; i++) later(() => {
+      const size = Math.round(R(34, 74)), c = PICK(ch);
+      if (mode === 'rain') push({ k: 'emo', c, size, x: R(30, W - 30), y: -size, vx: R(-30, 30), vy: R(280, 560), g: 0, rot: R(0, 6), vr: R(-3, 3), sw: R(0, 6), life: 9, max: 9, sway: R(10, 40) });
+      else if (mode === 'rise') push({ k: 'emo', c, size, x: R(60, W - 60), y: H + size, vx: 0, vy: -R(150, 330), g: 0, rot: 0, vr: 0, sw: R(0, 6), life: 9, max: 9, sway: R(20, 60), fade: true });
+      else push({ k: 'emo', c, size, x: W / 2 + R(-80, 80), y: H + size, vx: R(-460, 460), vy: -R(780, 1180), g: 1350, rot: R(0, 6), vr: R(-5, 5), sw: 0, life: 5, max: 5, sway: 0 });
+    }, mode === 'burst' ? R(0, 500) : i * (mode === 'rain' ? 120 : 140));
+  }
+  function confetti(o) {
+    const n = 55 * o.power;
+    for (const side of [0, 1]) for (let i = 0; i < n; i++) later(() => { const a = R(22, 52) * Math.PI / 180, s = R(620, 1250); push({ k: 'rect', x: side ? W + 10 : -10, y: H + 10, vx: (side ? -1 : 1) * Math.cos(a) * s, vy: -Math.sin(a) * s - 250, g: 900, drag: .985, col: o.color || PICK(PAL), w: R(9, 16), h: R(5, 9), rot: R(0, 6), vr: R(-9, 9), fl: R(0, 6), life: R(3.2, 5), max: 5 }); }, R(0, 380));
+  }  function balloons(o) {
+    const n = 5 + o.power * 3;
+    for (let i = 0; i < n; i++) later(() => push({ k: 'bal', x: R(60, W - 60), y: H + 90, vx: 0, vy: -R(95, 190), col: o.color || PICK(PAL), sw: R(0, 6), sway: R(14, 46), life: 14, max: 14 }), i * 260 + R(0, 160));
+  }
+  function snow(o) { const n = 70 + o.power * 60; for (let i = 0; i < n; i++) later(() => push({ k: 'flake', x: R(0, W), y: -10, vx: R(-20, 20), vy: R(70, 190), r: R(2, 5.5), sw: R(0, 6), sway: R(10, 30), life: 12, max: 12 }), i * (4200 / n)); }
+  function stars(o) { const n = 5 + o.power * 3; for (let i = 0; i < n; i++) later(() => { const s = R(700, 1200); push({ k: 'comet', x: R(W * .25, W * 1.05), y: -40, px: 0, py: 0, vx: -s * .55, vy: s * .83, col: o.color || PICK(['#fff6a8', '#a8e6ff', '#ffd1f0']), life: 2.6, max: 2.6 }); }, i * 220 + R(0, 160)); }
+  function lightning(o) { flash = 1; flashCol = o.color || '#dfeaff'; for (let b = 0; b < 1 + o.power; b++) { let x = R(W * .15, W * .85), y = 0; const pts = [[x, y]]; while (y < H) { y += R(40, 90); x += R(-70, 70); pts.push([x, y]); } bolts.push({ pts, life: .38, max: .38 }); } }
+  function shockwave(o) { for (let i = 0; i < 2 + o.power; i++) later(() => rings.push({ r: 20, max: Math.max(W, H) * .62, life: 1, col: o.color || PICK(['#00F0FF', '#ff2bd6', '#fbbf24']) }), i * 240); }
+  // ---- reactions: a big emoji pops with comic rays + a phrase, plus the matching little particle show ----
+  function reaction(id, o) {
+    const d = FX_REACT[id] || FX_REACT.reaction, w = $i('fxw'); if (!w) return;
+    const col = o.color || d[3], em = glyphs(o.emoji, [d[0]])[0], phrase = String(o.text || d[1] || '').replace(/\{user\}/g, o.user || '');
+    w.querySelectorAll('.fxr').forEach((x) => x.remove());
+    const el = document.createElement('div'); el.className = 'fxr v-' + id + (id === 'welcome' ? ' welcome' : ''); el.style.setProperty('--fc', col);
+    if (id === 'welcome') { el.innerHTML = '<div class="spot"></div><div class="wc"><i></i><span></span></div>'; el.querySelector('i').textContent = em; el.querySelector('span').textContent = phrase; }
+    else { el.innerHTML = '<div class="rays"></div><div class="em"></div>' + (phrase ? '<div class="ph"></div>' : ''); el.querySelector('.em').textContent = em; if (phrase) el.querySelector('.ph').textContent = phrase; }
+    w.appendChild(el); const hold = id === 'welcome' ? 3000 : 2700; setTimeout(() => { el.classList.add('out'); setTimeout(() => el.remove(), 480); }, hold);
+    const p = { power: 2, emoji: '', color: col };
+    if (id === 'meme_laugh') emoji({ ...p, emoji: '😂🤣' }, 'burst', ['😂']); else if (id === 'meme_cry') emoji({ ...p, emoji: '💧😢' }, 'rain', ['💧']); else if (id === 'meme_clap') { emoji({ ...p, emoji: '👏' }, 'burst', ['👏']); confetti({ ...p, power: 1 }); }
+    else if (id === 'meme_fire') emoji({ ...p, emoji: '🔥' }, 'rise', ['🔥']); else if (id === 'meme_wow') { stars(p); fireworks({ ...p, power: 2 }, false, false); } else if (id === 'meme_boom') { flash = .8; flashCol = '#fff'; shockwave(p); } else if (id === 'meme_shock') { lightning({ ...p, power: 1 }); }
+    else if (id === 'welcome') confetti({ ...p, power: 1 });
+  }  const effects = {
+    ...Object.fromEntries(Object.keys(FX_REACT).map((id) => [id, (o) => reaction(id, o)])),
+    fireworks: (o) => fireworks(o, false, false), megafireworks: (o) => { fireworks(o, true, false); flash = .35; flashCol = '#fff'; }, heartworks: (o) => fireworks({ ...o, color: o.color || '#ff4d8d' }, false, true),
+    confetti, emojirain: (o) => emoji(o, 'rain', ['🎁', '✨', '🎉']), emojiburst: (o) => emoji(o, 'burst', ['🎉', '💎', '🔥', '⭐']), hearts: (o) => emoji(o, 'rise', ['❤️', '💖', '💗', '💕', '💘']),
+    balloons, coins: (o) => emoji({ ...o, emoji: o.emoji || '🪙💰' }, 'rain', ['🪙']), snow, stars, lightning, shockwave, flash: (o) => { flash = .9; flashCol = o.color || '#fff'; },
+  };
+  const run = (id, o = {}) => { const f = effects[id]; if (f) f({ power: Math.max(1, Math.min(3, +o.power || 2)), emoji: o.emoji || '', color: o.color || '', text: o.text || '', user: o.user || '' }); };
+  function step() {
+    if (!ctx) return; const now = performance.now(), dt = Math.min(.05, (now - last) / 1000 || .016); last = now;
+    ctx.clearRect(0, 0, W, H);
+    if (flash > .01) { ctx.globalAlpha = Math.min(.85, flash); ctx.fillStyle = flashCol; ctx.fillRect(0, 0, W, H); ctx.globalAlpha = 1; flash *= Math.pow(.02, dt); }
+    for (let i = rings.length - 1; i >= 0; i--) { const r = rings[i]; r.life -= dt * 1.1; r.r += (r.max - r.r) * dt * 2.4; if (r.life <= 0) { rings.splice(i, 1); continue; } ctx.save(); ctx.globalAlpha = Math.max(0, r.life); ctx.strokeStyle = r.col; ctx.lineWidth = 3 + 14 * r.life; ctx.shadowColor = r.col; ctx.shadowBlur = 40; ctx.beginPath(); ctx.arc(W / 2, H / 2, r.r, 0, 6.283); ctx.stroke(); ctx.restore(); }
+    for (let i = bolts.length - 1; i >= 0; i--) { const b = bolts[i]; b.life -= dt; if (b.life <= 0) { bolts.splice(i, 1); continue; } ctx.save(); ctx.globalAlpha = b.life / b.max; ctx.strokeStyle = '#eaf2ff'; ctx.lineWidth = 5; ctx.shadowColor = '#7aa8ff'; ctx.shadowBlur = 36; ctx.lineJoin = 'round'; ctx.beginPath(); b.pts.forEach((p, j) => j ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1])); ctx.stroke(); ctx.restore(); }
+    ctx.globalCompositeOperation = 'lighter';
+    for (let i = P.length - 1; i >= 0; i--) {
+      const p = P[i]; p.life -= dt; if (p.life <= 0 && p.k !== 'rocket') { P.splice(i, 1); continue; }
+      if (p.k === 'dot') { p.px = p.x; p.py = p.y; p.vy += p.g * dt; p.vx *= p.drag; p.vy *= p.drag; p.x += p.vx * dt; p.y += p.vy * dt; const a = Math.max(0, p.life / p.max); ctx.globalAlpha = a; ctx.strokeStyle = p.col; ctx.fillStyle = p.col; if (p.trail) { ctx.lineWidth = p.size * .9; ctx.beginPath(); ctx.moveTo(p.px, p.py); ctx.lineTo(p.x, p.y); ctx.stroke(); } ctx.beginPath(); ctx.arc(p.x, p.y, p.size * (.6 + a * .6), 0, 6.283); ctx.fill(); }
+      else if (p.k === 'rocket') { p.px = p.x; p.py = p.y; p.vy += p.g * dt; p.x += p.vx * dt; p.y += p.vy * dt; ctx.globalAlpha = 1; ctx.strokeStyle = '#fff'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(p.px, p.py); ctx.lineTo(p.x, p.y); ctx.stroke(); dot(p.x, p.y, R(-30, 30), R(20, 80), '#ffd9a0', .45, { size: 2, g: 80 }); if (p.vy > -40 || p.y <= p.ty) { explode(p.x, p.y, p.col, p.type === 'double' ? 'peony' : p.type, p.kk); if (p.type === 'double') later(() => explode(p.x, p.y, PICK(PAL), 'ring', p.kk * .7), 230); P.splice(i, 1); } }
+      else if (p.k === 'glow') { const a = Math.max(0, p.life / p.max); const g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.size); g.addColorStop(0, p.col); g.addColorStop(1, 'rgba(0,0,0,0)'); ctx.globalAlpha = a * .7; ctx.fillStyle = g; ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, 6.283); ctx.fill(); }
+      else if (p.k === 'comet') { p.px = p.x; p.py = p.y; p.x += p.vx * dt; p.y += p.vy * dt; const a = Math.min(1, p.life / p.max * 2); const g = ctx.createLinearGradient(p.x, p.y, p.x - p.vx * .22, p.y - p.vy * .22); g.addColorStop(0, p.col); g.addColorStop(1, 'rgba(255,255,255,0)'); ctx.globalAlpha = a; ctx.strokeStyle = g; ctx.lineWidth = 5; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(p.x - p.vx * .22, p.y - p.vy * .22); ctx.stroke(); ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(p.x, p.y, 5, 0, 6.283); ctx.fill(); }
+    }
+    ctx.globalCompositeOperation = 'source-over';
+    for (let i = P.length - 1; i >= 0; i--) {
+      const p = P[i];
+      if (p.k === 'emo') { p.vy += (p.g || 0) * dt; p.sw += dt * 2.2; p.x += (p.vx + Math.cos(p.sw) * p.sway) * dt; p.y += p.vy * dt; p.rot += (p.vr || 0) * dt; if (p.y > H + 120 || p.y < -160 || p.x < -120 || p.x > W + 120) { P.splice(i, 1); continue; } ctx.save(); ctx.globalAlpha = p.fade ? Math.min(1, Math.max(0, (p.y + 40) / (H * .5))) : 1; ctx.translate(p.x, p.y); ctx.rotate(p.rot); const s = sprite(p.c, p.size); ctx.drawImage(s, -s.width / 2, -s.height / 2); ctx.restore(); }
+      else if (p.k === 'rect') { p.vy += p.g * dt; p.vx *= p.drag; p.vy *= p.drag; p.x += p.vx * dt; p.y += p.vy * dt; p.rot += p.vr * dt; p.fl += dt * 9; if (p.y > H + 40) { P.splice(i, 1); continue; } ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.rot); ctx.scale(1, Math.cos(p.fl)); ctx.fillStyle = p.col; ctx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h); ctx.restore(); }
+      else if (p.k === 'bal') { p.sw += dt * 1.6; p.x += Math.cos(p.sw) * p.sway * dt; p.y += p.vy * dt; if (p.y < -130) { P.splice(i, 1); continue; } ctx.save(); ctx.translate(p.x, p.y); ctx.strokeStyle = 'rgba(255,255,255,.55)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(0, 42); ctx.quadraticCurveTo(10 * Math.sin(p.sw * 2), 78, 0, 112); ctx.stroke(); const g = ctx.createRadialGradient(-10, -14, 4, 0, 0, 44); g.addColorStop(0, '#fff'); g.addColorStop(.25, p.col); g.addColorStop(1, p.col); ctx.fillStyle = g; ctx.beginPath(); ctx.ellipse(0, 0, 32, 40, 0, 0, 6.283); ctx.fill(); ctx.fillStyle = p.col; ctx.beginPath(); ctx.moveTo(-6, 42); ctx.lineTo(6, 42); ctx.lineTo(0, 50); ctx.fill(); ctx.fillStyle = 'rgba(255,255,255,.45)'; ctx.beginPath(); ctx.ellipse(-12, -16, 7, 11, -.5, 0, 6.283); ctx.fill(); ctx.restore(); }
+      else if (p.k === 'flake') { p.sw += dt * 1.5; p.x += (p.vx + Math.cos(p.sw) * p.sway) * dt; p.y += p.vy * dt; if (p.y > H + 10) { P.splice(i, 1); continue; } ctx.globalAlpha = .9; ctx.fillStyle = '#fff'; ctx.shadowColor = '#bfe3ff'; ctx.shadowBlur = 8; ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, 6.283); ctx.fill(); ctx.shadowBlur = 0; ctx.globalAlpha = 1; }
+    }
+    ctx.globalAlpha = 1;
+  }
+  const clear = () => { timers.forEach(clearTimeout); timers = []; P = []; bolts = []; rings = []; flash = 0; };
+  return { init: (c) => { cv = c; ctx = c.getContext('2d'); const rs = () => { W = c.width = innerWidth; H = c.height = innerHeight; }; rs(); addEventListener('resize', rs); last = performance.now(); setInterval(step, 16); }, run, clear, count: () => P.length };
+})();
+// rules: «when this happens -> play this effect». Likes use «every N» crossings, gifts match by value / name, chat by keyword.
+const fxLast = {};
+function fxBanner(text, col) {
+  const w = $i('fxw'); if (!w || !text) return;
+  w.querySelectorAll('.fxb').forEach((b) => b.remove());
+  const b = document.createElement('div'); b.className = 'fxb'; b.style.setProperty('--fc', col || '#00F0FF'); b.textContent = text; w.appendChild(b);
+  setTimeout(() => { b.classList.add('out'); setTimeout(() => b.remove(), 520); }, 3200);
+}
+function fxFire(r, ev) {
+  const col = r.color || '#00F0FF', txt = String(r.text || '').replace(/\{user\}/g, ev.user || '').replace(/\{gift\}/g, ev.gift || '').replace(/\{count\}/g, ev.count || 1).replace(/\{diamonds\}/g, ev.diamonds || '').replace(/\{total\}/g, ev.total || '');
+  const isR = !!FX_REACT[r.effect];
+  FXE.run(r.effect, { ...r, text: isR ? txt : '', user: ev.user || '' }); if (txt && !isR) fxBanner(txt, col);
+  if (!DEMO) { const snd = r.sound === 'auto' ? (FX_REACT[r.effect] || [])[2] : r.sound; if (/^https:\/\//i.test(r.audio || '')) playSound(null, r.audio); else if (snd && snd !== 'none') playSound(snd); }
+}
+function fxHandle(ev, prevLikes) {
+  if (ev.type === 'fxtest') { fxFire({ effect: ev.effect, emoji: ev.emoji, color: ev.color, power: ev.power, sound: 'auto', text: '' }, { user: 'سارة' }); return; }
+  if (ev.type === 'reset' || ev.type === 'jarreset') { if (ev.type === 'reset') FXE.clear(); return; }
+  const F = CFG.fx || {}; if (F.on === false) return;
+  const rules = Array.isArray(F.rules) ? F.rules : FX_DEFAULT_RULES;
+  const low = String(ev.text || '').toLowerCase(), gname = String(ev.gift || '').toLowerCase();
+  for (const r of rules) {
+    if (!r || r.on === false || r.event !== ev.type) continue;
+    const words = String(r.match || '').toLowerCase().split(',').map((s) => s.trim()).filter(Boolean);
+    if (ev.type === 'gift') { if ((+r.min || 0) > (ev.diamonds || 0)) continue; if (words.length && !words.some((w) => gname.includes(w))) continue; }
+    else if (ev.type === 'like') { const st = Math.max(1, +r.min || 100); if (!(Math.floor(S.likes / st) > Math.floor(prevLikes / st))) continue; }
+    else if (ev.type === 'chat') { if (!words.length || !words.some((w) => low.includes(w))) continue; }
+    const now = Date.now(), key = r.name + '|' + r.event + '|' + r.effect;
+    if ((+r.cd || 0) > 0 && now - (fxLast[key] || 0) < r.cd * 1000) continue;
+    fxLast[key] = now; fxFire(r, ev);
+  }
+}
+const views = {
+  'gift-rocket': { init: () => root.innerHTML = '<div class="card" style="width:420px"><div style="margin-bottom:8px;font-weight:800">🚀 GIFT ROCKET <span id="n"></span></div><div class="bar"><i id="f" style="background:linear-gradient(90deg,#00F0FF,#9d4edd)"></i></div></div>',
+    draw: () => { $i('n').textContent = Math.min(S.gifts, goalTarget) + '/' + goalTarget; $i('f').style.width = pct(S.gifts, goalTarget) + '%'; } },
+
+  'gift-timer': { init: () => { root.innerHTML = `<div class="timer ${VAR}" id="tm"></div>`; clearInterval(window.gtT); if (!DEMO) window.gtT = setInterval(() => { if (S.secs > 0) S.secs--; $i('tm').textContent = fmt(S.secs); }, 1000); }, draw: () => { $i('tm').textContent = fmt(S.secs); } },
+
+  'goal-bar': { cfg: true,
+    init: () => {
+      const g = CFG.goal, c1 = esc(g.c1), c2 = esc(g.c2), grad = `linear-gradient(90deg,${c1},${c2})`, title = `🎯 ${esc(g.title)}`;
+      const head = `<div class="row" style="font-weight:800;font-size:20px;margin-bottom:8px"><span>${title}</span><span id="gn" dir="ltr"></span></div>`;
+      if (VAR === 'ring') root.innerHTML = `<div class="card" style="display:flex;align-items:center;gap:16px"><svg width="120" height="120" viewBox="0 0 120 120"><circle cx="60" cy="60" r="50" fill="none" stroke="rgba(255,255,255,.12)" stroke-width="12"/><circle id="rg" cx="60" cy="60" r="50" fill="none" stroke="${c1}" stroke-width="12" stroke-linecap="round" stroke-dasharray="314" stroke-dashoffset="314" transform="rotate(-90 60 60)" style="transition:stroke-dashoffset .7s;filter:drop-shadow(0 0 6px ${c1})"/><text id="rp" x="60" y="68" text-anchor="middle" fill="#fff" font-size="26" font-weight="800">0%</text></svg><div><div style="font-weight:800;font-size:22px">${title}</div><div id="gn" dir="ltr" style="opacity:.8"></div></div></div>`;
+      else if (VAR === 'segment') root.innerHTML = `<div class="card" style="width:560px">${head}<div id="sg">${'<i></i>'.repeat(10)}</div></div>`;
+      else if (VAR === 'battery') root.innerHTML = `<div style="display:flex;align-items:center;gap:6px;width:520px"><div style="flex:1;height:64px;border:4px solid ${c1};border-radius:14px;padding:5px;box-shadow:0 0 18px ${c1}88"><div id="f" class="" style="height:100%;width:0;border-radius:8px;background:${grad};transition:width .6s;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:22px;color:#06121a"></div></div><div style="width:12px;height:26px;background:${c1};border-radius:0 6px 6px 0"></div></div>`;
+      else if (VAR === 'pill') root.innerHTML = `<div style="width:560px;height:54px;border-radius:99px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.3);backdrop-filter:blur(8px);position:relative;overflow:hidden"><div id="f" style="position:absolute;inset:0 auto 0 0;width:0;background:${grad};transition:width .6s"></div><div style="position:absolute;inset:0;display:flex;justify-content:space-between;align-items:center;padding:0 22px;font-weight:800;font-size:20px;text-shadow:0 1px 6px #000"><span>${title}</span><span id="gn" dir="ltr"></span></div></div>`;
+      else root.innerHTML = `<div class="card" style="width:560px;border-color:${c1}88;box-shadow:0 0 24px ${c1}55">${head}<div class="bar" style="height:20px"><i id="f" style="background:${grad}"></i></div></div>`;
+    },
+    draw: () => {
+      const cur = goalCur(), tg = goalTgt(), p = pct(cur, tg);
+      if ($i('gn')) $i('gn').textContent = cur + ' / ' + tg;
+      if ($i('f')) { $i('f').style.width = p + '%'; if (VAR === 'battery') $i('f').textContent = Math.round(p) + '%'; }
+      if ($i('rg')) { $i('rg').style.strokeDashoffset = 314 * (1 - p / 100); $i('rp').textContent = Math.round(p) + '%'; }
+      if ($i('sg')) { const on = Math.round(p / 10); const g = CFG.goal; [...$i('sg').children].forEach((el, i) => el.style.background = i < on ? `linear-gradient(90deg,${g.c1},${g.c2})` : ''); }
+    } },
+
+  'rscene': { init: () => {
+    const sym = { stars: ['✦', '✧', '⭐'], lanterns: ['🏮'], crescent: ['🌙', '✦'], dust: ['✨', '·', '•'] }[VAR] || ['✦'], up = VAR === 'lanterns';
+    let h = ''; for (let i = 0; i < 22; i++) h += `<span class="rs" style="left:${(i * 4.7 + (i % 3) * 3) % 98}%;font-size:${16 + (i * 7) % 26}px;color:#f3c969;text-shadow:0 0 10px #f3c969;animation-name:${up ? 'rsup' : 'rsfall'};animation-duration:${6 + (i * 5) % 7}s;animation-delay:-${(i * 3) % 9}s">${sym[i % sym.length]}</span>`;
+    root.innerHTML = `<div id="rsx" style="position:fixed;inset:0;overflow:hidden">${h}${VAR === 'crescent' ? '<div style="position:absolute;top:24px;right:50px;font-size:120px;filter:drop-shadow(0 0 30px #f3c969);animation:pulse 4s infinite">🌙</div>' : ''}</div>`; }, draw: () => {} },
+  'jar': { cfg: true, init: () => {
+    const J = Object.assign({ cap: 140, verb: 'أهدى', unit: 'عملة', bubble: true, top: true, total: true, sound: true }, CFG.jar || {});
+    const parts = String(VAR || 'glass').split('-'), SHN = parts.length > 1 ? parts[0] : 'jar', TH = parts[parts.length - 1] || 'glass', SH = JARS[SHN] || JARS.jar, W = 460, H = 700;
+    const FLOOR = SH.floor, inner = SH.inner, CAP = () => Math.min(+J.cap || 140, SH.cap);    root.innerHTML = `<div id="jw" class="${esc(TH)}">
+      ${SH.back}
+      <canvas id="jcv" width="${W}" height="${H}"></canvas>
+
+      ${SH.front}
+      <span class="jsp" style="left:34px;top:300px;font-size:22px">✦</span><span class="jsp" style="left:404px;top:420px;font-size:18px;animation-delay:.9s">✧</span><span class="jsp" style="left:60px;top:560px;font-size:16px;animation-delay:1.7s">✦</span><span class="jsp" style="left:388px;top:200px;font-size:20px;animation-delay:.4s">✧</span>
+      <div id="jbub"></div>
+      <div class="jp jtc" id="jtop" style="display:none"></div><div class="jp jtl" id="jtot" style="display:${J.total ? 'flex' : 'none'}"><span class="jcoin"></span><b id="jtn">0</b></div></div>`;
+    if (DEMO) { const k = Math.min(1, (innerHeight - 8) / 812), w = $i('jw'); w.style.left = Math.round(innerWidth / 2 - 230) + 'px'; w.style.bottom = '4px'; w.style.transformOrigin = 'center bottom'; w.style.transform = 'scale(' + k + ')'; }
+    const cv = $i('jcv'), ctx = cv.getContext('2d');
+    const EM = { rose: '🌹', heart: '❤️', 'finger heart': '🫰', 'hand heart': '🫶', gg: '🏆', 'ice cream cone': '🍦', 'ice cream': '🍦', doughnut: '🍩', donut: '🍩', perfume: '🧴', sunglasses: '🕶️', lion: '🦁', universe: '🌌', galaxy: '🌌', 'tiktok universe': '🌌', diamond: '💎', bits: '💎', 'gift sub': '⭐', crown: '👑', 'money gun': '💸', fireworks: '🎆', rocket: '🚀', panda: '🐼', coffee: '☕', confetti: '🎉', butterfly: '🦋', swan: '🦢', yacht: '🛥️', 'sports car': '🏎️', dragon: '🐉', cap: '🧢', 'love you': '😘', wow: '😲', 'drama queen': '👸', corgi: '🐶', train: '🚂' };
+    const emojiOf = (ev) => { const g = String(ev.gift || '').toLowerCase(); if (EM[g]) return EM[g]; const v = (ev.diamonds || 0) / Math.max(1, ev.count || 1); return v >= 1000 ? '👑' : v >= 100 ? '💎' : v >= 10 ? '🎁' : '🌹'; };
+    const coinsOf = (ev) => ev.diamonds > 0 ? ev.diamonds : (ev.count || 1);
+    const okImg = (u) => /^https:\/\//i.test(u || '') && String(u).length < 600;
+    const imgs = {}, sprites = {};
+    const sprite = (ch, r) => { const k = ch + '|' + r; if (sprites[k]) return sprites[k]; const c = document.createElement('canvas'); c.width = c.height = Math.ceil(r * 2.6); const x = c.getContext('2d'); x.font = `${Math.round(r * 1.75)}px "Segoe UI Emoji","Apple Color Emoji","Noto Color Emoji",sans-serif`; x.textAlign = 'center'; x.textBaseline = 'middle'; x.shadowColor = 'rgba(0,0,0,.28)'; x.shadowBlur = 3; x.shadowOffsetY = 1; x.fillText(ch, c.width / 2, c.height / 2 + r * .08); return (sprites[k] = c); };
+    const getImg = (u) => { if (!okImg(u)) return null; if (!(u in imgs)) { const im = new Image(); im.referrerPolicy = 'no-referrer'; im.onerror = () => { imgs[u] = null; }; im.src = u; imgs[u] = im; } const im = imgs[u]; return im && im.complete && im.naturalWidth ? im : null; };
+    const AREA = (() => { let s = 0; for (let y = SH.spawnY; y < FLOOR; y += 4) { const [a, b] = inner(y); s += Math.max(0, b - a) * 4; } return s; })();
+    const B = []; let coins = 0, donors = {}, bq = [], bubBusy = false, last = performance.now(), ticks = 0;
+    const KEY = 'sg-jar-' + (q.get('k') || 'local');
+    const persist = () => { if (DEMO) return; try { localStorage.setItem(KEY, JSON.stringify({ coins, donors, items: B.filter(b => !b.dead).slice(-CAP()).map(b => ({ ch: b.ch, r: b.r, img: b.img || '' })) })); } catch {} };
+    const drop = (ch, r, img, delay = 0) => setTimeout(() => {
+      const [a, b] = inner(SH.spawnY); const x = a + r + 8 + Math.random() * Math.max(1, b - a - 2 * r - 16);
+      B.push({ x, y: -r - 10, vx: (Math.random() - .5) * 60, vy: 120 + Math.random() * 140, r, ch, img, rot: Math.random() * 6, vr: (Math.random() - .5) * 6, a: 1, dead: false });
+      // keep the pile physically possible: never more gifts than fit (by area), the oldest ones fade out first
+      const live = B.filter(o => !o.dead); let area = live.reduce((s, o) => s + Math.PI * o.r * o.r, 0), k = 0;
+      while ((live.length - k > CAP() || area > AREA * .56) && k < live.length - 1) { area -= Math.PI * live[k].r * live[k].r; live[k].dead = true; k++; }
+    }, delay);
+    const step = () => {
+      const now = performance.now(); let dt = Math.min(.05, (now - last) / 1000); last = now; if (dt <= 0) return;
+      const T0 = performance.now(); window.__jarTicks = (window.__jarTicks || 0) + 1;
+      const n = 2, h = dt / n;
+      for (let s = 0; s < n; s++) {
+        for (const o of B) { o.vy += 1700 * h; o.x += o.vx * h; o.y += o.vy * h; o.rot += o.vr * h; o.vx *= .998; o.vr *= .99; if (o.vy > 1500) o.vy = 1500;
+          if (o.y > 100) { const [a, b] = inner(Math.min(o.y, FLOOR)); if (o.x < a + o.r) { o.x = a + o.r; if (o.vx < 0) o.vx *= -.25; } if (o.x > b - o.r) { o.x = b - o.r; if (o.vx > 0) o.vx *= -.25; } if (o.y > FLOOR - o.r) { o.y = FLOOR - o.r; if (o.vy > 0) o.vy = o.vy > 260 ? -o.vy * .22 : 0; o.vx *= .9; o.vr *= .8; } } }
+        for (let it = 0; it < 4; it++) for (let i = 0; i < B.length; i++) { const p = B[i]; if (p.y < 90 && p.dead) continue;
+          for (let j = i + 1; j < B.length; j++) { const q2 = B[j]; const dx = q2.x - p.x, dy = q2.y - p.y, m = p.r + q2.r - 1; if (dx * dx + dy * dy < m * m) { const d = Math.sqrt(dx * dx + dy * dy) || .01, nx = dx / d, ny = dy / d, pen = (m - d) / 2; p.x -= nx * pen; p.y -= ny * pen; q2.x += nx * pen; q2.y += ny * pen;
+              const rv = (q2.vx - p.vx) * nx + (q2.vy - p.vy) * ny; if (rv < 0) { const imp = -rv * (rv < -240 ? .6 : 1.0); p.vx -= imp * nx; p.vy -= imp * ny; q2.vx += imp * nx; q2.vy += imp * ny; const t = (q2.vx - p.vx) * -ny + (q2.vy - p.vy) * nx; p.vr += t * .004; q2.vr += t * .004; p.vx *= .99; q2.vx *= .99; if (Math.abs(rv) < 90) { p.vy *= .9; q2.vy *= .9; p.vr *= .85; q2.vr *= .85; } } } } }
+      }
+      for (let i = B.length - 1; i >= 0; i--) { const o = B[i]; if (o.dead) { o.a -= dt * 2.2; if (o.a <= 0) B.splice(i, 1); } }
+      ctx.clearRect(0, 0, W, H);
+      for (const o of B) { ctx.save(); ctx.globalAlpha = Math.max(0, o.a); ctx.translate(o.x, o.y); ctx.rotate(o.rot); const im = getImg(o.img); if (im) { const sz = o.r * 2.1; ctx.drawImage(im, -sz / 2, -sz / 2, sz, sz); } else { const sp = sprite(o.ch, o.r); ctx.drawImage(sp, -sp.width / 2, -sp.height / 2); } ctx.restore(); }
+      window.__jarMs = (window.__jarMs || 0) * .9 + (performance.now() - T0) * .1;
+      if (++ticks % 120 === 0) persist();
+    };
+    clearInterval(window.jarT); window.jarT = setInterval(step, 16);
+    const hue = (s) => { let h = 0; for (const c of String(s)) h = (h * 31 + c.charCodeAt(0)) % 360; return h; };
+    const avatar = (name, url, cls) => okImg(url) ? `<img class="av" src="${esc(url)}" referrerpolicy="no-referrer" onerror="this.outerHTML='<span class=\\'av\\' style=\\'background:hsl(${hue(name)},60%,45%)\\'>${esc(String(name).slice(0, 1).toUpperCase())}</span>'">` : `<span class="av" style="background:hsl(${hue(name)},60%,45%)">${esc(String(name).slice(0, 1).toUpperCase())}</span>`;
+    const countUp = (el, to) => { const from = +(el.dataset.v || 0); el.dataset.v = to; const t0 = performance.now(); const tick = () => { const k = Math.min(1, (performance.now() - t0) / 700); el.textContent = Math.round(from + (to - from) * (1 - Math.pow(1 - k, 3))).toLocaleString('en-US'); if (k < 1) setTimeout(tick, 30); }; tick(); };
+    const drawPills = (pop) => {
+      countUp($i('jtn'), coins);
+      const names = Object.keys(donors).sort((a, b) => donors[b].c - donors[a].c), t = $i('jtop');
+      if (J.top && names.length) { const n = names[0], d = donors[n]; t.style.display = 'flex'; t.innerHTML = `<span class="medal">🏅</span>${avatar(n, d.av)}<span dir="auto" style="max-width:210px;overflow:hidden;text-overflow:ellipsis">${esc(n)}</span><span class="chip"><span class="jcoin"></span>${d.c.toLocaleString('en-US')}</span>`; if (pop) { t.classList.remove('jpulse'); void t.offsetWidth; t.classList.add('jpulse'); } }
+    };
+    const clink = () => { if (!J.sound || DEMO) return; try { const A = window.__jac || (window.__jac = new (window.AudioContext || window.webkitAudioContext)()); const t0 = A.currentTime; [1318, 1760].forEach((f, i) => { const o = A.createOscillator(), g = A.createGain(); o.type = 'sine'; o.frequency.value = f; g.gain.setValueAtTime(0, t0 + i * .07); g.gain.linearRampToValueAtTime(.05, t0 + i * .07 + .01); g.gain.exponentialRampToValueAtTime(.0001, t0 + i * .07 + .35); o.connect(g); g.connect(A.destination); o.start(t0 + i * .07); o.stop(t0 + i * .07 + .4); }); } catch {} };
+    const nextBubble = () => {
+      if (bubBusy || !bq.length) return; bubBusy = true; const e = bq.shift(), box = $i('jbub');
+      box.innerHTML = `<div class="jb">${avatar(e.user, e.avatar)}<span><b dir="auto">${esc(e.user)}</b> ${esc(J.verb)} ${esc(e.ch)} <b class="gn">${esc(e.gift)} ×${e.count}</b> (<b class="co">${e.c.toLocaleString('en-US')} ${esc(J.unit)}</b>)</span></div>`;
+      const hold = bq.length > 3 ? 1100 : 3000; setTimeout(() => { const b = box.firstChild; if (b) b.classList.add('out'); setTimeout(() => { box.innerHTML = ''; bubBusy = false; nextBubble(); }, 450); }, hold);
+    };
+    window.jarGift = (ev) => {
+      const c = coinsOf(ev), cnt = Math.max(1, ev.count || 1), per = c / cnt, ch = emojiOf(ev), r = Math.round(Math.max(17, Math.min(SH.rMax, 16 + Math.log2(1 + per) * 3)));
+      const n = Math.min(cnt, 14); for (let i = 0; i < n; i++) drop(ch, r, okImg(ev.img) ? ev.img : '', i * 110);
+      coins += c; const d = donors[ev.user] || (donors[ev.user] = { c: 0, av: '' }); d.c += c; if (okImg(ev.avatar)) d.av = ev.avatar;
+      drawPills(true); persist();
+      if (J.bubble) { bq.push({ user: ev.user || '—', avatar: ev.avatar, ch, gift: ev.gift || 'Gift', count: cnt, c }); if (bq.length > 6) bq.splice(0, bq.length - 6); nextBubble(); }
+      clink();
+    };
+    window.jarBodies = () => B;
+    window.jarReset = () => { B.forEach(o => { o.dead = true; }); coins = 0; donors = {}; $i('jtn').dataset.v = 0; $i('jtn').textContent = '0'; $i('jtop').style.display = 'none'; persist(); };
+    // restore what was in the jar before this page was (re)loaded; the gallery preview gets a nice demo pile
+    let saved = null; try { saved = DEMO ? null : JSON.parse(localStorage.getItem(KEY) || 'null'); } catch {}
+    if (saved && saved.items) { coins = +saved.coins || 0; donors = saved.donors || {}; saved.items.forEach((it, i) => drop(it.ch, it.r, it.img, i * 14)); drawPills(false); }
+    else if (DEMO) { const ch = ['🌹', '❤️', '🦁', '💎', '🌹', '🎁', '🌹', '👑', '🍩', '🌹']; for (let i = 0; i < 46; i++) drop(ch[i % ch.length], 17 + (i % 4) * 3, '', 300 + i * 38); coins = 1280; donors = { 'سارة': { c: 740, av: '' } }; drawPills(false); setTimeout(() => window.jarGift({ user: 'Ahmed', gift: 'Rose', count: 5, diamonds: 5 }), 2600); }
+  }, draw: () => {} },
+  'fx': { cfg: true, init: () => {
+    root.innerHTML = '<div id="fxw"><canvas id="fxc"></canvas></div>'; FXE.init($i('fxc'));
+    if (DEMO) { const demo = ['fireworks', 'confetti', 'hearts', 'balloons', 'megafireworks', 'emojirain', 'lightning', 'shockwave', 'stars']; let i = 0; const go = () => { FXE.run(demo[i++ % demo.length], { power: 2 }); }; setTimeout(go, 400); setInterval(go, 3200); }
+  }, draw: () => {} },
+  'dhikr': { init: () => { root.innerHTML = '<div id="dhw" style="position:absolute;top:60px;left:50%;transform:translateX(-50%)"></div>'; let n = 0; const show = () => { $i('dhw').innerHTML = `<div class="dh ${esc(VAR)}">${esc(DHIKR[n++ % DHIKR.length])}</div>`; }; show(); clearInterval(window.dhT); window.dhT = setInterval(show, DEMO ? 3500 : 9000); }, draw: () => {} },
+
+  'lastsup': { init: () => { root.innerHTML = '<div id="ls" style="position:absolute;top:30px;left:30px"></div>'; }, draw: () => {
+    const a = LASTSUP_STYLES[VAR] || LASTSUP_STYLES.neon, r = S.recent.find(x => /🎁/.test(x)) || S.recent[0] || 'بانتظار أول داعم…';
+    $i('ls').innerHTML = `<div class="ls" style="--bg:${a[1]};--b:${a[2]};--tx:${a[3]};--g:${a[4]}88;${a[5]}"><span style="font-size:38px">🏅</span><div><small>آخر داعم</small><b>${esc(r)}</b></div></div>`; } },
+
+  'goalt': { cfg: true, init: () => {
+    const th = GOAL_THEMES[VAR] || GOAL_THEMES.star, g = CFG.goal;
+    root.innerHTML = `<div class="gt" style="--c1:${th[2]};--c2:${th[3]}"><div class="gh"><span>${th[1]} ${esc(g.title)}</span><span id="gn" dir="ltr"></span></div><div class="gb"><i id="f"></i><em id="gm">${th[1]}</em></div></div>`; },
+    draw: () => { const cur = goalCur(), tg = goalTgt(), p = pct(cur, tg); $i('gn').textContent = cur + ' / ' + tg; $i('f').style.width = p + '%'; $i('gm').style.left = Math.max(3, Math.min(97, p)) + '%'; } },
+  'alerts': { cfg: true, init: () => { root.innerHTML = '<div id="al" style="position:absolute;top:70px;left:50%;transform:translateX(-50%)"></div>'; }, draw: () => {} },
+
+  'taps': { cfg: true, init: () => { shownTaps = S.likes; root.innerHTML = `<div id="tp" style="position:absolute;top:30px;left:30px">${(TAPUI[VAR] || TAPUI.neon).html(CFG.taps)}</div><div id="fx" style="position:absolute;inset:0;pointer-events:none;overflow:hidden"></div>`; }, draw: () => { tapGen++; const gen = tapGen; raf(() => tapFrame(gen)); } },
+
+  'wheel': { cfg: true,
+    init: () => { root.innerHTML = `<div id="wh" style="width:560px;text-align:center"><div style="font:900 28px Cairo,sans-serif;margin-bottom:8px;text-shadow:0 2px 12px #000">🎡 ${esc(CFG.wheel.title)}</div><div style="position:relative;width:520px;height:520px;margin:0 auto"><canvas id="wc" width="520" height="520"></canvas><div style="position:absolute;top:-10px;left:50%;transform:translateX(-50%);font-size:50px;filter:drop-shadow(0 0 8px #000);line-height:1">🔻</div></div><div id="wr" style="height:56px;margin-top:10px;font:900 34px Cairo,sans-serif"></div></div>`; },
+    draw: () => drawWheel() },
+
+  'tts': { cfg: true,
+    init: () => { root.innerHTML = `<div class="card" id="tts" style="display:inline-flex;align-items:center;gap:12px;font-weight:800"><span>🔊 قارئ التعليقات ${CFG.tts.engine === 'browser' ? '(صوت المتصفح)' : '☁️ (صوت سحابي)'}</span><span id="ts" style="opacity:.75;font-weight:600">جاهز</span><button id="tb" style="font:inherit;padding:4px 12px;border-radius:99px;border:0;background:linear-gradient(90deg,#00F0FF,#9d4edd);color:#06121a;font-weight:800;cursor:pointer">اضغط لتفعيل الصوت</button></div>`; $i('tb').onclick = () => { speakWith(' ', { volume: 0 }); try { new Audio('data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=').play(); } catch {} $i('tb').remove(); }; if (window.obsstudio) $i('tts').style.display = 'none'; },
+    draw: () => {} },
+
+  'canvas': { init: () => { root.style.padding = '0'; root.innerHTML = '<div id="cv" style="position:absolute;left:0;top:0;overflow:hidden"></div>'; }, draw: layoutCanvas },
+
+  'hearts': { init: () => { root.innerHTML = '<div style="position:absolute;right:30px;bottom:20px;width:180px;height:100%;pointer-events:none" id="hr"></div><div class="card" style="position:absolute;left:20px;top:20px;font-size:26px;font-weight:900">❤️ <span id="lk"></span></div>'; }, draw: () => { $i('lk').textContent = S.likes; } },
+
+  'top': { init: () => { topRowsMap = new Map(); topFirst = true; root.innerHTML = '<div id="tl" style="width:340px;position:relative"></div>'; }, draw: renderTop },
+
+  'social': { cfg: true, init: () => {
+      injectSoc(); clearInterval(window.socT);
+      let list = []; try { list = q.get('s') ? JSON.parse(q.get('s')) : (CFG.social || []); } catch {}
+      if (!list.length) list = [{ p: 'tiktok', h: '@your_name' }];
+      const html = (it) => socHTML({ ...it, st: VAR || it.st });
+      root.innerHTML = '<div id="sc" style="position:absolute;top:30px;left:50%;transform:translateX(-50%);transition:opacity .4s"></div>';
+      let i = 0; const show = () => { $i('sc').style.opacity = 0; setTimeout(() => { $i('sc').innerHTML = html(list[i++ % list.length]); $i('sc').style.opacity = 1; }, 400); };
+      $i('sc').innerHTML = html(list[i++ % list.length]);
+      if (list.length > 1) window.socT = setInterval(show, 6000);
+    }, draw: () => {} },
+
+  'chat': { init: () => { root.innerHTML = `<div class="card chat ${VAR}" id="c" style="width:400px;max-height:380px;overflow:hidden"></div>`; if (VAR === 'bubble') { $i('c').style.background = 'transparent'; $i('c').style.border = '0'; } }, draw: () => {} },
+
+  'uchat': { init: () => { root.innerHTML = '<div id="uc"></div>'; $i('uc').style.setProperty('--ucfs', (CFG.uchat.fs || 22) + 'px'); },
+    draw: () => { const u = $i('uc'); if (!u) return; u.style.setProperty('--ucfs', (CFG.uchat.fs || 22) + 'px'); while (u.children.length > CFG.uchat.max) u.firstChild.remove(); } },
+
+  'ticker': { cfg: true, init: () => { root.innerHTML = `<div id="tk" class="${VAR}"><span id="tt" style="display:inline-block;padding-left:100%"></span></div>`; },
+    draw: () => {
+      const k = CFG.ticker; $i('tk').style.display = k.on ? '' : 'none';
+      const top = Object.entries(S.board).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([u, c], i) => `${['🥇', '🥈', '🥉'][i]} ${u} (${c})`);
+      const parts = [];
+      if (k.text) parts.push(k.text);
+      if (k.mode !== 'top') parts.push(...S.recent.slice(0, 5));
+      if (k.mode !== 'latest') parts.push(...top);
+      const tt = $i('tt'); tt.textContent = (parts.length ? parts : ['بانتظار الأحداث…']).join('   ✦   ') + '   ✦   ';
+      tt.style.animation = `mq ${Math.max(12, tt.scrollWidth / (+k.speed || 40))}s linear infinite`;
+    } },
+
+  'recent': { init: () => { root.innerHTML = '<div id="rc" style="width:320px;display:grid;gap:8px"></div>'; },
+    draw: () => {
+      const cards = VAR === 'cards';
+      $i('rc').innerHTML = (S.recent.length ? S.recent : ['بانتظار الأحداث…']).slice(0, OPT.custom ? OPT.rows : 6).map((t, i) => cards
+        ? `<div style="padding:10px 16px;border-radius:14px;background:linear-gradient(90deg,#9d4edd55,rgba(10,14,26,.85));border:1px solid #9d4edd88;font-weight:700;animation:slide .4s">${esc(t)}</div>`
+        : `<div style="padding:4px 0;border-bottom:1px solid rgba(255,255,255,.15);font-weight:700;opacity:${1 - i * .13};text-shadow:0 1px 6px #000;animation:slide .4s">${esc(t)}</div>`).join('');
+    } },
+
+  'counter': { init: () => { root.innerHTML = '<div class="card" style="display:inline-flex;align-items:center;gap:16px;padding:14px 26px;border:2px solid #00F0FF;box-shadow:0 0 26px #00F0FF77"><span id="ci" style="font-size:44px"></span><div><div id="cl" style="opacity:.75;font-weight:700;letter-spacing:1px"></div><div id="cn" style="font-size:54px;font-weight:900;line-height:1;color:#00F0FF;text-shadow:0 0 14px #00F0FF;font-variant-numeric:tabular-nums"></div></div></div>'; },
+    draw: () => { const [ic, lb, get] = COUNTERS[VAR] || COUNTERS.gifts; $i('ci').textContent = ic; $i('cl').textContent = lb; $i('cn').textContent = get(); } },
+
+  'versus': { init: () => { const [a, b] = VS[VAR] || VS.neon; root.innerHTML = `<div class="card" style="width:560px;border-color:${a}88"><div class="row" style="font-weight:900;font-size:22px"><b style="color:${a}">الفريق A</b><b style="color:${b}">الفريق B</b></div><div class="bar" style="height:24px;background:${b}"><i id="f" style="width:50%;background:${a};box-shadow:0 0 16px ${a}"></i></div><div class="row" style="font-size:26px;font-weight:900"><span id="a">0</span><span id="b">0</span></div></div>`; },
+    draw: () => { const a = S.vsA || 0, b = S.vsB || 0; $i('a').textContent = a; $i('b').textContent = b; $i('f').style.width = (a + b ? a / (a + b) * 100 : 50) + '%'; } },
+};
+const V = views[T] || views['gift-rocket'];
+V.init(); V.draw();
+
+// settings: live from the server in OBS (?k=), from localStorage/BroadcastChannel in the dashboard
+const applyCfg = (c) => {
+  CFG = { ...DEFAULT_CFG, ...c };
+  if (q.get('k')) store.set('lsx-cfg', CFG); // cache it, so the reload below already resolves the chosen template
+  // the style was switched in the dashboard: reload once (window.name guards against reload loops if storage is blocked)
+  if (SLOT && (pickTpl().id || '') !== (TPL.id || '') && Date.now() - (+String(window.name).replace('sg:', '') || 0) > 4000) { window.name = 'sg:' + Date.now(); location.reload(); return; }
+  readOpts(); applyOpts();
+  if (V.cfg) { V.init(); V.draw(); } else V.draw();
+};
+if (q.get('k')) fetch('/cfg/' + q.get('k')).then(r => r.json()).then(applyCfg).catch(() => {});
+
+// ---- alerts engine: queue, show card, play sound, speak ----
+const aq = []; let busy = false;
+const ONLY_KEYS = { follow: ['follow'], like: ['like', 'milestone'] }; // single-purpose templates (follow-*, like-burst)
+const BIG = new Set(['bigGift', 'milestone', 'goal']);
+const tapAcc = {}; // taps ("تكبيس") per viewer since their last tap alert
+// which configured alerts does this event trigger? -> [[settings, event, key], ...]
+function alertsFor(ev, prevLikes) {
+  const A = CFG.alerts, out = [];
+  const add = (k, extra = {}) => { const c = A[k]; if (c && c.on) out.push([c, { ...ev, ...extra }, k]); };
+  if (ev.type === 'gift') { const b = A.bigGift; if (b && b.on && (ev.diamonds || 0) >= (+b.min || 100)) add('bigGift'); else add('gift'); }
+  else if (['follow', 'sub', 'share', 'join', 'raid'].includes(ev.type)) add(ev.type);
+  else if (ev.type === 'like') {
+    const c = A.like;
+    if (c && c.on) { tapAcc[ev.user] = (tapAcc[ev.user] || 0) + (ev.count || 1); if (tapAcc[ev.user] >= (+c.min || 50)) { add('like', { count: tapAcc[ev.user] }); tapAcc[ev.user] = 0; } }
+    const m = A.milestone, step = +(m && m.min) || 1000;
+    if (m && m.on && Math.floor(S.likes / step) > Math.floor(prevLikes / step)) out.push([m, { ...ev, user: '', total: Math.floor(S.likes / step) * step }, 'milestone']);
+  }
+  const g = A.goal, cur = goalCur(), tg = goalTgt();
+  if (g && g.on && !DEMO) { if (cur >= tg && !S.goalDone) { S.goalDone = true; out.push([g, { ...ev, user: '', title: CFG.goal.title }, 'goal']); } else if (cur < tg) S.goalDone = false; }
+  return out;
+}
+function runAlert() {
+  if (busy || !aq.length) return; busy = true;
+  const [c, ev, key] = aq.shift();
+  const text = (TPL.txt && key !== 'bigGift' && key !== 'goal' ? TPL.txt : c.text).replace(/\{dhikr\}/g, () => DHIKR[Math.random() * DHIKR.length | 0]).replace(/\{user\}/g, ev.user || '').replace(/\{gift\}/g, ev.gift || '').replace(/\{count\}/g, ev.count || 1).replace(/\{total\}/g, ev.total || '').replace(/\{title\}/g, ev.title || '').replace(/\{diamonds\}/g, ev.diamonds || '');
+  const big = BIG.has(key);
+  $i('al').innerHTML = `<div class="alc al-${VAR || 'neon'} an-${OPT.anim}${big ? ' big' : ''}" style="--c:${esc(TPL.c || c.color)}">${c.img ? `<img src="${esc(c.img)}">` : ''}<div>${esc(text)}</div></div>`;
+  if (big) confetti();
+  if (!DEMO) { playSound(c.sound, c.audio); if (c.tts) speak(text); }
+  setTimeout(() => { $i('al').innerHTML = ''; busy = false; runAlert(); }, DEMO ? 2800 : big ? 7000 : 5200);
+}
+function confetti() {
+  const box = $i('al'); if (!box) return;
+  for (let i = 0; i < 18; i++) {
+    const s = document.createElement('span'); s.textContent = ['🎉', '✨', '💎', '⭐', '🔥'][i % 5];
+    s.style.cssText = `position:absolute;left:${Math.random() * 100}%;top:60%;font-size:${20 + Math.random() * 22}px;pointer-events:none;animation:rise ${1.6 + Math.random() * 1.4}s ease-out forwards;animation-delay:${Math.random() * .5}s`;
+    box.appendChild(s);
+  }
+}
+function floatHeart(n) {
+  for (let i = 0; i < Math.min(n, 8); i++) setTimeout(() => {
+    const h = document.createElement('div'); h.textContent = ['❤️', '💖', '💗', '💜'][Math.random() * 4 | 0];
+    h.style.cssText = `position:absolute;bottom:0;left:${Math.random() * 140}px;font-size:${28 + Math.random() * 26}px;animation:rise ${2.4 + Math.random()}s ease-out forwards`;
+    $i('hr').appendChild(h); setTimeout(() => h.remove(), 3600);
+  }, i * 120);
+}
+// unified chat line: messages are appended in the order the server received them (TikTok and Twitch share one event stream)
+function uchatAdd(ev) {
+  const c = $i('uc'), U = CFG.uchat; if (!c) return;
+  const pf = ev.platform === 'twitch' ? 'twitch' : ev.platform === 'kick' ? 'kick' : 'tiktok';
+  if (!String(ev.text || '').trim()) return; // sticker/emote-only comments arrive with no text
+  if (!U[pf] || (U.hideBots && ev.bot) || (U.hideCmds && String(ev.text).trim().startsWith('!'))) return;
+  const bot = !!ev.bot, icon = U.badge !== 'text', badge = icon ? (pf === 'twitch' ? '🟣' : pf === 'kick' ? '🟩' : '🎵') : (pf === 'twitch' ? 'TWITCH' : pf === 'kick' ? 'KICK' : 'TIKTOK');
+  const el = document.createElement('div'); el.className = `ucl ${VAR || 'card'} ${pf}`;
+  el.innerHTML = `<span class="pb ${pf}${icon ? ' ic' : ''}">${badge}</span><span class="un ${bot ? 'bot' : pf}">${bot ? '🤖 ' : ''}${esc(ev.user)}${ev.sub ? ' <span class="st">★</span>' : ''}</span><span class="ut">${esc(ev.text)}</span>`;
+  c.appendChild(el); trimLines(c, uchatMax(U));
+  expireLine(el);
+}
+// chat lines disappear after the timer (dashboard: «تختفي الرسالة بعد») so only the newest messages stay on screen
+// a new message pushes the oldest one out: it fades and is removed, so only the newest N lines stay
+function trimLines(c, max) {
+  max = Math.max(1, +max || 1);
+  let live = [...c.children].filter((x) => !x.classList.contains('fade-out'));
+  while (live.length > max) { const old = live.shift(); old.classList.add('fade-out'); setTimeout(() => old.remove(), 450); }
+}
+function expireLine(el) {
+  const s = uchatTtl(CFG.uchat);
+  if (s > 0) setTimeout(() => { el.classList.add('fade-out'); setTimeout(() => el.remove(), 650); }, s * 1000);
+}
+function chatAdd(ev) {
+  const c = $i('c'); if (!c) return;
+  const n = c.children.length;
+  const mark = ev.platform === 'twitch' ? '🟣 ' : ev.platform === 'kick' ? '🟩 ' : '';
+  c.insertAdjacentHTML('beforeend', VAR === 'bubble' ? `<span class="bub ${n % 2 ? 'b2' : ''}"><b style="color:#fff;opacity:.85">${mark}${esc(ev.user)}</b> ${esc(ev.text)}</span>` : `<div><b>${mark}${esc(ev.user)}${VAR === 'terminal' ? ' &gt;' : ':'}</b> ${esc(ev.text)}</div>`);
+  expireLine(c.lastElementChild);
+  trimLines(c, OPT.custom ? OPT.rows + 1 : uchatMax(CFG.uchat));
+}
+
+const handle = (ev) => {
+  if (ev.type === 'config') { applyCfg(ev.cfg); return; }
+  if (ev.type === 'reset') { Object.assign(S, { gifts: 0, follows: 0, likes: 0, board: {}, lboard: {}, secs: 900, vsA: 0, vsB: 0, recent: [] }); }
+  const msg = { gift: `🎁 ${ev.user} ×${ev.count || 1}`, follow: `➕ ${ev.user}`, sub: `⭐ ${ev.user}`, share: `🔁 ${ev.user}`, raid: `🚀 ${ev.user} ×${ev.count || 0}` }[ev.type];
+  if (msg) S.recent = [msg, ...S.recent].slice(0, 8);
+  const prevLikes = S.likes;
+  if (ev.type === 'gift') { S.gifts += ev.count || 1; S.board[ev.user] = (S.board[ev.user] || 0) + (ev.count || 1); S.secs += 10 * (ev.count || 1);
+    if (ev.team === 'B') S.vsB = (S.vsB || 0) + (ev.count || 1); else S.vsA = (S.vsA || 0) + (ev.count || 1);
+    if (T === 'gift-rocket') pop(`🎁 ${esc(ev.user)} أرسل ${esc(ev.gift || 'هدية')} ×${ev.count || 1}`); }
+  if (T === 'jar') { if (ev.type === 'reset' || ev.type === 'jarreset') window.jarReset && window.jarReset(); else if ((ev.type === 'gift' || ev.type === 'sub') && window.jarGift) window.jarGift(ev.type === 'sub' ? { ...ev, gift: 'Sub', count: 1, diamonds: 0 } : ev); }
+  if (ev.type === 'follow') S.follows++;
+  if (ev.type === 'like') { S.likes = ev.total > 0 ? ev.total : S.likes + (ev.count || 1); S.lboard[ev.user] = (S.lboard[ev.user] || 0) + (ev.count || 1); if (T === 'hearts') floatHeart(ev.count || 1); if (T === 'taps') { tapBurst(ev.count || 1); tapCelebrate(prevLikes); } }
+  if (T === 'fx') fxHandle(ev, prevLikes);
+  if (ev.type === 'chat' && T === 'chat') chatAdd(ev);
+  if (ev.type === 'chat' && T === 'uchat') uchatAdd(ev);
+  if ((SIM || DEMO) && ev.type === 'gift') giftFx(ev);
+  if (T === 'wheel' && (ev.type === 'spin' || wheelTriggered(ev))) spinWheel();
+  if (T === 'tts' && ev.type === 'chat' && ev.user !== '🤖' && !ev.noTts) ttsHandle(ev); // AI replies are read too, unless the streamer turned that off
+  if (T === 'alerts') {
+    const keys = ONLY ? ONLY_KEYS[ONLY] : null;
+    alertsFor(ev, prevLikes).filter(a => !keys || keys.includes(a[2])).forEach(a => aq.push(a));
+    if (aq.length > 6) aq.splice(0, aq.length - 6); // never let a busy stream build a long backlog
+    runAlert();
+  }
+  save(); V.draw();
+};
+listen(handle);
+
+// gallery previews: feed the template sample events so it looks alive
+if (DEMO) {
+  const names = ['سارة', 'Ahmed', 'Lina', 'خالد'];
+  const kinds = T === 'taps' ? ['tapdemo'] : T === 'alerts' ? (ONLY ? [ONLY] : ['gift', 'follow', 'big', 'tap', 'share', 'sub']) : T === 'hearts' ? ['like'] : (T === 'chat' || T === 'uchat') ? ['chat'] : [];
+  let n = 0;
+  // sample events for the alert previews (gifts of different value, a burst of taps, a likes milestone...)
+  const sample = (k) => ({ tapdemo: { type: 'like', count: 37 }, big: { type: 'gift', diamonds: 500, gift: 'Lion', count: 1 }, tap: { type: 'like', count: 60 }, like: n % 2 ? { type: 'like', count: 60 } : { type: 'like', count: 1, total: 1000 * (1 + n) } }[k]);
+  if (T === 'chat') ['أهلاً بالجميع 👋', 'بث حلو والله', 'كم الهدف اليوم؟'].forEach((t, i) => chatAdd({ user: names[i], text: t }));
+  if (T === 'uchat') [['سارة', 'أهلاً بالجميع 👋', 'tiktok'], ['Ninja', 'GG what a play!', 'twitch'], ['خالد', 'بث حلو والله', 'tiktok'], ['Hype', '!hype', 'twitch'], ['Lina', 'وين الهدف؟', 'tiktok'], ['Noor', 'LETS GOOO', 'twitch'], ['Trainwreck', 'KEKW', 'kick']].forEach(([u, t, p], i) => uchatAdd({ user: u, text: t, platform: p, sub: i % 3 === 1 }));
+  if (kinds.length) setTimeout(() => setInterval(() => { const k = kinds[n++ % kinds.length]; handle({ type: k, user: names[n % 4], count: 1 + n % 4, gift: 'Rose', text: ['مرحبا!', 'ممتاز 🔥', 'ما شاء الله'][n % 3], ...(sample(k) || {}), ...(T === 'uchat' ? { platform: ['tiktok', 'twitch', 'kick'][n % 3] } : {}), ts: Date.now() + n }); }, 3600), 300);
+  if (kinds.length) setTimeout(() => handle({ type: kinds[0] === 'like' ? 'like' : kinds[0] === 'big' ? 'gift' : kinds[0], user: 'سارة', count: kinds[0] === 'like' ? 60 : 3, gift: 'Rose', text: 'مرحبا!', ts: Date.now() }), 400);
+}
+</script>
+</body>
+</html>
